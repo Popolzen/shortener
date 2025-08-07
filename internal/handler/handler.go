@@ -21,7 +21,7 @@ func PostHandler(shortURLs map[string]string) http.HandlerFunc {
 			http.Error(w, "Неправильное тело запроса", http.StatusBadRequest)
 		}
 
-		shortURL, err := service.Shortener("longURL", shortURLs)
+		shortURL, err := service.Shortener(string(body), shortURLs)
 		if err != nil {
 			http.Error(w, "Не удалось сгенерить короткую ссылку", http.StatusBadRequest)
 		}
