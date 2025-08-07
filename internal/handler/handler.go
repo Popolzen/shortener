@@ -19,11 +19,13 @@ func PostHandler(shortURLs map[string]string) http.HandlerFunc {
 
 		if err != nil {
 			http.Error(w, "Неправильное тело запроса", http.StatusBadRequest)
+			return
 		}
 
 		shortURL, err := service.Shortener(string(body), shortURLs)
 		if err != nil {
 			http.Error(w, "Не удалось сгенерить короткую ссылку", http.StatusBadRequest)
+			return
 		}
 		shortURLs[shortURL] = string(body)
 
@@ -48,6 +50,7 @@ func GetHandler(shortURLs map[string]string) http.HandlerFunc {
 		if longURL, exists := shortURLs[shortURL]; exists {
 			w.Header().Set("Location", longURL)
 			w.WriteHeader(http.StatusTemporaryRedirect)
+			return
 		}
 
 		http.Error(w, "Не нашли ссылку", http.StatusBadRequest)
