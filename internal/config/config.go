@@ -8,8 +8,8 @@ type Config struct {
 }
 
 func (c *Config) getArgsFromCli() {
-	flag.StringVar(&c.ServerAddr, c.ServerAddr, "localhost", "server host")
-	flag.StringVar(&c.BaseURL, c.BaseURL, "BaseURL", "server Port")
+	flag.StringVar(&c.ServerAddr, "a", c.ServerAddr, "server host")
+	flag.StringVar(&c.BaseURL, "b", c.BaseURL, "base url for short links")
 	flag.Parse()
 }
 
