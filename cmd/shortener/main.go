@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
+	"github.com/Popolzen/shortener/internal/config"
 	"github.com/Popolzen/shortener/internal/handler"
 	"github.com/gin-gonic/gin"
 )
@@ -15,8 +17,13 @@ func main() {
 	r.POST("/", handler.PostHandler(shortURLs))
 	r.GET("/:id", handler.GetHandler(shortURLs))
 
-	log.Println("Сервер запущен на порту 8080")
-	if err := r.Run(":8080"); err != nil {
+	cfg := config.NewConfig()
+
+	addr := fmt.Sprintf("%s:%s", cfg.Host, cfg.Port)
+	log.Printf("URL Shortener запущен на http://%s", addr)
+
+	if err := r.Run(addr); err != nil {
 		log.Fatal("Не удалось запустить сервер:", err)
 	}
+
 }
