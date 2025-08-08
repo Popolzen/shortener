@@ -3,20 +3,20 @@ package config
 import "flag"
 
 type Config struct {
-	Host string
-	Port string
+	ServerAddr string
+	BaseURL    string
 }
 
 func (c *Config) getArgsFromCli() {
-	flag.StringVar(&c.Host, "a", "localhost", "server host")
-	flag.StringVar(&c.Port, "b", "8080", "server Port")
+	flag.StringVar(&c.ServerAddr, c.ServerAddr, "localhost", "server host")
+	flag.StringVar(&c.BaseURL, c.BaseURL, "BaseURL", "server Port")
 	flag.Parse()
 }
 
 func NewConfig() *Config {
 	c := &Config{
-		Host: "localhost",
-		Port: "8080",
+		ServerAddr: ":8080", // значения по умолчанию
+		BaseURL:    "http://localhost:8080",
 	}
 	c.getArgsFromCli()
 	return c
@@ -24,5 +24,9 @@ func NewConfig() *Config {
 
 // Возвращает полнгый адрес сервера
 func (c Config) Address() string {
-	return c.Host + ":" + c.Port
+	return c.ServerAddr
+}
+
+func (c Config) GetBaseURL() string {
+	return c.BaseURL
 }

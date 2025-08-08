@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/Popolzen/shortener/internal/config"
@@ -11,15 +10,15 @@ import (
 
 func main() {
 	shortURLs := make(map[string]string)
-
-	r := gin.Default()
-
-	r.POST("/", handler.PostHandler(shortURLs))
-	r.GET("/:id", handler.GetHandler(shortURLs))
+	gin.SetMode(gin.ReleaseMode)
 
 	cfg := config.NewConfig()
 
-	addr := fmt.Sprintf("%s:%s", cfg.Host, cfg.Port)
+	r := gin.Default()
+	r.POST("/", handler.PostHandler(shortURLs, cfg))
+	r.GET("/:id", handler.GetHandler(shortURLs))
+
+	addr := cfg.Address()
 	log.Printf("URL Shortener запущен на http://%s", addr)
 
 	if err := r.Run(addr); err != nil {

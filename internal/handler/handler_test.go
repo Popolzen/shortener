@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Popolzen/shortener/internal/config"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -105,7 +106,7 @@ func TestPostHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			router := gin.New()
-			router.POST("/", PostHandler(tt.shortURLs))
+			router.POST("/", PostHandler(tt.shortURLs, &config.Config{BaseURL: "http://localhost:8080/"}))
 
 			// Создаем тестовый запрос
 			req := httptest.NewRequest(tt.method, "/", strings.NewReader(tt.request))

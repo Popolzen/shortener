@@ -6,12 +6,13 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Popolzen/shortener/internal/config"
 	"github.com/Popolzen/shortener/internal/service"
 	"github.com/gin-gonic/gin"
 )
 
 // PostHandler создает короткую ссылку
-func PostHandler(shortURLs map[string]string) gin.HandlerFunc {
+func PostHandler(shortURLs map[string]string, cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Читаем тело запроса
 		body, err := io.ReadAll(c.Request.Body)
@@ -26,7 +27,7 @@ func PostHandler(shortURLs map[string]string) gin.HandlerFunc {
 			return
 		}
 
-		fullShortURL := "http://localhost:8080/" + shortURL
+		fullShortURL := cfg.BaseURL + shortURL
 		c.Header("Content-Type", "text/plain")
 		c.Header("Content-Length", strconv.Itoa(len(fullShortURL)))
 		c.String(http.StatusCreated, fullShortURL)
