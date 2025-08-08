@@ -16,7 +16,7 @@ func (c *Config) getArgsFromCli() {
 func NewConfig() *Config {
 	c := &Config{
 		ServerAddr: ":8080", // значения по умолчанию
-		BaseURL:    "http://localhost:8080",
+		BaseURL:    "http://localhost:8080/",
 	}
 	c.getArgsFromCli()
 	return c
