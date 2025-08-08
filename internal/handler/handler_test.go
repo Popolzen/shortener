@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -49,10 +50,14 @@ func TestGetHandler(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			router := gin.New()
+			router.GET("/:id", GetHandler(tt.shortURLs))
+
 			r := httptest.NewRequest(tt.method, tt.request, nil)
 			w := httptest.NewRecorder()
-			h := http.HandlerFunc(GetHandler(tt.shortURLs))
-			h(w, r)
+			// h := http.HandlerFunc(GetHandler(tt.shortURLs))
+			// h(w, r)
+			router.ServeHTTP(w, r)
 			res := w.Result()
 
 			// Проверяем коды статуса
@@ -96,24 +101,18 @@ func TestPostHandler(t *testing.T) {
 				response:    "http://localhost:8080/",
 			},
 		},
-		{
-			name:      "Не тот метод",
-			method:    http.MethodGet,
-			shortURLs: map[string]string{},
-			request:   "www.google.com",
-			want: want{
-				contentType: "",
-				statusCode:  400,
-				response:    "",
-			},
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := httptest.NewRequest(tt.method, "/", strings.NewReader(tt.request))
+			router := gin.New()
+			router.POST("/", PostHandler(tt.shortURLs))
+
+			// Создаем тестовый запрос
+			req := httptest.NewRequest(tt.method, "/", strings.NewReader(tt.request))
 			w := httptest.NewRecorder()
-			h := http.HandlerFunc(PostHandler(tt.shortURLs))
-			h(w, r)
+
+			// Выполняем запрос
+			router.ServeHTTP(w, req)
 			res := w.Result()
 
 			// Проверяем коды статуса

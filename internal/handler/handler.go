@@ -7,53 +7,45 @@ import (
 	"strings"
 
 	"github.com/Popolzen/shortener/internal/service"
+	"github.com/gin-gonic/gin"
 )
 
-func PostHandler(shortURLs map[string]string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Неподдерживаемый метод", http.StatusBadRequest)
-			return
-		}
-		body, err := io.ReadAll(r.Body)
-
+// PostHandler создает короткую ссылку
+func PostHandler(shortURLs map[string]string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Читаем тело запроса
+		body, err := io.ReadAll(c.Request.Body)
 		if err != nil {
-			http.Error(w, "Неправильное тело запроса", http.StatusBadRequest)
+			c.String(http.StatusBadRequest, "Неправильное тело запроса")
 			return
 		}
 
 		shortURL, err := service.Shortener(string(body), shortURLs)
 		if err != nil {
-			http.Error(w, "Не удалось сгенерить короткую ссылку", http.StatusBadRequest)
+			c.String(http.StatusBadRequest, "Не удалось сгенерить короткую ссылку")
 			return
 		}
-		shortURLs[shortURL] = string(body)
 
-		shortURL = "http://localhost:8080/" + shortURL
-
-		l := strconv.Itoa(len(shortURL))
-
-		w.Header().Set("Content-Type", "text/plain")
-		w.Header().Set("Content-Length", l)
-		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte(shortURL))
+		fullShortURL := "http://localhost:8080/" + shortURL
+		c.Header("Content-Type", "text/plain")
+		c.Header("Content-Length", strconv.Itoa(len(fullShortURL)))
+		c.String(http.StatusCreated, fullShortURL)
 	}
-
 }
-func GetHandler(shortURLs map[string]string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Неподдерживаемый метод", http.StatusBadRequest)
-			return
-		}
-		shortURL := strings.TrimPrefix(r.URL.Path, "/")
-		if longURL, exists := shortURLs[shortURL]; exists {
-			w.Header().Set("Location", longURL)
-			w.Header().Set("Content-Type", "text/plain")
-			w.WriteHeader(http.StatusTemporaryRedirect)
+
+// GetHandler перенаправляет по короткой ссылке
+func GetHandler(shortURLs map[string]string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		shortURL := strings.TrimPrefix(c.Request.URL.Path, "/")
+
+		if longURL, exists := (shortURLs)[shortURL]; exists {
+			c.Header("Location", longURL)
+			c.Header("Content-Type", "text/plain")
+			c.Status(http.StatusTemporaryRedirect)
 			return
 		}
 
-		http.Error(w, "Не нашли ссылку", http.StatusBadRequest)
+		c.String(http.StatusBadRequest, "Не нашли ссылку")
 	}
 }
