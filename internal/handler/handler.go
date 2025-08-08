@@ -27,7 +27,7 @@ func PostHandler(shortURLs map[string]string, cfg *config.Config) gin.HandlerFun
 			return
 		}
 
-		fullShortURL := cfg.BaseURL + shortURL
+		fullShortURL := cfg.BaseURL + "/" + shortURL
 		c.Header("Content-Type", "text/plain")
 		c.Header("Content-Length", strconv.Itoa(len(fullShortURL)))
 		c.String(http.StatusCreated, fullShortURL)
