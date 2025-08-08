@@ -49,6 +49,7 @@ func GetHandler(shortURLs map[string]string) http.HandlerFunc {
 		shortURL := strings.TrimPrefix(r.URL.Path, "/")
 		if longURL, exists := shortURLs[shortURL]; exists {
 			w.Header().Set("Location", longURL)
+			w.Header().Set("Content-Type", "text/plain")
 			w.WriteHeader(http.StatusTemporaryRedirect)
 			return
 		}

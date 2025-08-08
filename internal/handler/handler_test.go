@@ -4,7 +4,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -13,21 +12,61 @@ import (
 )
 
 func TestGetHandler(t *testing.T) {
-	type args struct {
-		shortURLs map[string]string
+	type want struct {
+		contentType string
+		statusCode  int
+		response    string
 	}
 	tests := []struct {
-		name string
-		args args
-		want http.HandlerFunc
+		name      string
+		request   string
+		shortURLs map[string]string
+		want      want
+		method    string
 	}{
-		// TODO: Add test cases.
+		{
+			name:      "Корректный запрос",
+			method:    http.MethodGet,
+			shortURLs: map[string]string{"wag1oE": "www.google.com"},
+			request:   "http://localhost:8080/wag1oE",
+			want: want{
+				contentType: "text/plain",
+				statusCode:  http.StatusTemporaryRedirect,
+				response:    "www.google.com",
+			},
+		},
+		{
+			name:      "Не нашли ссылку",
+			method:    http.MethodGet,
+			shortURLs: map[string]string{"1111": "www.google.com"},
+			request:   "http://localhost:8080/wag1oE",
+			want: want{
+				contentType: "text/plain; charset=utf-8", // по умолчанию
+				statusCode:  http.StatusBadRequest,
+				response:    "",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := GetHandler(tt.args.shortURLs); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetHandler() = %v, want %v", got, tt.want)
-			}
+			r := httptest.NewRequest(tt.method, tt.request, nil)
+			w := httptest.NewRecorder()
+			h := http.HandlerFunc(GetHandler(tt.shortURLs))
+			h(w, r)
+			res := w.Result()
+
+			// Проверяем коды статуса
+			assert.Equal(t, tt.want.statusCode, res.StatusCode)
+			// получаем и проверяем тело запроса
+			defer res.Body.Close()
+			_, err := io.ReadAll(res.Body)
+
+			require.NoError(t, err)
+			// Если метод корректный и мы все ок возвращаем
+
+			assert.Equal(t, tt.want.contentType, res.Header.Get("Content-Type"))
+			// assert.Equal(t, 28, len(resBody))
+			assert.Equal(t, tt.want.response, res.Header.Get("Location"))
 		})
 	}
 }
