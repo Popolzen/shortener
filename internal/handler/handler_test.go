@@ -106,7 +106,7 @@ func TestPostHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			router := gin.New()
-			router.POST("/", PostHandler(tt.shortURLs, &config.Config{BaseURL: "http://localhost:8080/"}))
+			router.POST("/", PostHandler(tt.shortURLs, &config.Config{BaseURL: "http://localhost:8080"}))
 
 			// Создаем тестовый запрос
 			req := httptest.NewRequest(tt.method, "/", strings.NewReader(tt.request))
