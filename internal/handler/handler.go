@@ -7,12 +7,12 @@ import (
 	"strings"
 
 	"github.com/Popolzen/shortener/internal/config"
-	"github.com/Popolzen/shortener/internal/service"
+	"github.com/Popolzen/shortener/internal/service/shortener"
 	"github.com/gin-gonic/gin"
 )
 
 // PostHandler создает короткую ссылку
-func PostHandler(shortURLs map[string]string, cfg *config.Config) gin.HandlerFunc {
+func PostHandler(urlService shortener.URLService, cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Читаем тело запроса
 		body, err := io.ReadAll(c.Request.Body)
@@ -21,7 +21,7 @@ func PostHandler(shortURLs map[string]string, cfg *config.Config) gin.HandlerFun
 			return
 		}
 
-		shortURL, err := service.Shortener(string(body), shortURLs)
+		shortURL, err := urlService.Shorten(string(body))
 		if err != nil {
 			c.String(http.StatusBadRequest, "Не удалось сгенерить короткую ссылку")
 			return
@@ -35,18 +35,19 @@ func PostHandler(shortURLs map[string]string, cfg *config.Config) gin.HandlerFun
 }
 
 // GetHandler перенаправляет по короткой ссылке
-func GetHandler(shortURLs map[string]string) gin.HandlerFunc {
+func GetHandler(urlService shortener.URLService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		shortURL := strings.TrimPrefix(c.Request.URL.Path, "/")
 
-		if longURL, exists := (shortURLs)[shortURL]; exists {
-			c.Header("Location", longURL)
-			c.Header("Content-Type", "text/plain")
-			c.Status(http.StatusTemporaryRedirect)
+		longURL, err := urlService.GetLongURL(shortURL)
+		if err != nil {
+			c.String(http.StatusNotFound, "Не нашли ссылку")
 			return
 		}
 
-		c.String(http.StatusBadRequest, "Не нашли ссылку")
+		c.Header("Location", longURL)
+		c.Header("Content-Type", "text/plain")
+		c.Status(http.StatusTemporaryRedirect)
 	}
 }

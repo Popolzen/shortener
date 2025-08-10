@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/Popolzen/shortener/internal/config"
+	"github.com/Popolzen/shortener/internal/repository/memory"
+	"github.com/Popolzen/shortener/internal/service/shortener"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,118 +19,148 @@ func TestGetHandler(t *testing.T) {
 	type want struct {
 		contentType string
 		statusCode  int
-		response    string
+		location    string
 	}
 	tests := []struct {
 		name      string
-		request   string
-		shortURLs map[string]string
+		shortURL  string
+		longURL   string
 		want      want
 		method    string
+		setupData bool // нужно ли предварительно добавить данные
 	}{
 		{
 			name:      "Корректный запрос",
 			method:    http.MethodGet,
-			shortURLs: map[string]string{"wag1oE": "www.google.com"},
-			request:   "http://localhost:8080/wag1oE",
+			shortURL:  "test123",
+			longURL:   "www.google.com",
+			setupData: true,
 			want: want{
 				contentType: "text/plain",
 				statusCode:  http.StatusTemporaryRedirect,
-				response:    "www.google.com",
+				location:    "www.google.com",
 			},
 		},
 		{
 			name:      "Не нашли ссылку",
 			method:    http.MethodGet,
-			shortURLs: map[string]string{"1111": "www.google.com"},
-			request:   "http://localhost:8080/wag1oE",
+			shortURL:  "notfound",
+			longURL:   "",
+			setupData: false,
 			want: want{
-				contentType: "text/plain; charset=utf-8", // по умолчанию
-				statusCode:  http.StatusBadRequest,
-				response:    "",
+				contentType: "text/plain; charset=utf-8",
+				statusCode:  http.StatusNotFound,
+				location:    "",
 			},
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router := gin.New()
-			router.GET("/:id", GetHandler(tt.shortURLs))
+			// Создаем реальный memory репозиторий
+			repo := memory.NewURLRepository()
+			urlService := shortener.NewURLService(repo)
 
-			r := httptest.NewRequest(tt.method, tt.request, nil)
+			// Добавляем тестовые данные если нужно
+			if tt.setupData {
+				err := repo.Store(tt.shortURL, tt.longURL)
+				require.NoError(t, err)
+			}
+
+			// Настройка роутера
+			router := gin.New()
+			router.GET("/:id", GetHandler(urlService))
+
+			// Создание запроса
+			requestURL := "http://localhost:8080/" + tt.shortURL
+			r := httptest.NewRequest(tt.method, requestURL, nil)
 			w := httptest.NewRecorder()
-			// h := http.HandlerFunc(GetHandler(tt.shortURLs))
-			// h(w, r)
+
+			// Выполнение запроса
 			router.ServeHTTP(w, r)
 			res := w.Result()
 
-			// Проверяем коды статуса
+			// Проверки
 			assert.Equal(t, tt.want.statusCode, res.StatusCode)
-			// получаем и проверяем тело запроса
+
 			defer res.Body.Close()
 			_, err := io.ReadAll(res.Body)
-
 			require.NoError(t, err)
-			// Если метод корректный и мы все ок возвращаем
 
 			assert.Equal(t, tt.want.contentType, res.Header.Get("Content-Type"))
-			// assert.Equal(t, 28, len(resBody))
-			assert.Equal(t, tt.want.response, res.Header.Get("Location"))
+			assert.Equal(t, tt.want.location, res.Header.Get("Location"))
 		})
 	}
 }
 
 func TestPostHandler(t *testing.T) {
-
 	type want struct {
-		contentType string
-		statusCode  int
-		response    string
+		contentType    string
+		statusCode     int
+		responsePrefix string
 	}
 	tests := []struct {
-		name      string
-		request   string
-		shortURLs map[string]string
-		want      want
-		method    string
+		name    string
+		request string
+		want    want
+		method  string
 	}{
 		{
-			name:      "Корректный запрос",
-			method:    http.MethodPost,
-			shortURLs: map[string]string{},
-			request:   "www.google.com",
+			name:    "Корректный запрос",
+			method:  http.MethodPost,
+			request: "www.google.com",
 			want: want{
-				contentType: "text/plain",
-				statusCode:  201,
-				response:    "http://localhost:8080/",
+				contentType:    "text/plain",
+				statusCode:     http.StatusCreated,
+				responsePrefix: "http://localhost:8080/",
+			},
+		},
+		{
+			name:    "Пустое тело запроса",
+			method:  http.MethodPost,
+			request: "",
+			want: want{
+				contentType:    "text/plain",
+				statusCode:     http.StatusCreated,
+				responsePrefix: "http://localhost:8080/",
 			},
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router := gin.New()
-			router.POST("/", PostHandler(tt.shortURLs, &config.Config{BaseURL: "http://localhost:8080"}))
+			// Создаем реальный memory репозиторий
+			repo := memory.NewURLRepository()
+			urlService := shortener.NewURLService(repo)
 
-			// Создаем тестовый запрос
+			// Настройка роутера
+			router := gin.New()
+			router.POST("/", PostHandler(urlService, &config.Config{BaseURL: "http://localhost:8080"}))
+
+			// Создание запроса
 			req := httptest.NewRequest(tt.method, "/", strings.NewReader(tt.request))
 			w := httptest.NewRecorder()
 
-			// Выполняем запрос
+			// Выполнение запроса
 			router.ServeHTTP(w, req)
 			res := w.Result()
 
-			// Проверяем коды статуса
+			// Проверки
 			assert.Equal(t, tt.want.statusCode, res.StatusCode)
-			// получаем и проверяем тело запроса
+
 			defer res.Body.Close()
 			resBody, err := io.ReadAll(res.Body)
-
 			require.NoError(t, err)
-			// Если метод корректный и мы все ок возвращаем
-			if tt.method == http.MethodPost {
-				assert.Equal(t, tt.want.contentType, res.Header.Get("Content-Type"))
-				assert.Equal(t, 28, len(resBody))
-			}
 
+			assert.Equal(t, tt.want.contentType, res.Header.Get("Content-Type"))
+
+			// Проверяем, что ответ начинается с базового URL
+			responseString := string(resBody)
+			assert.True(t, strings.HasPrefix(responseString, tt.want.responsePrefix))
+
+			// Проверяем длину ответа (базовый URL + "/" + 6 символов короткой ссылки)
+			expectedLength := len(tt.want.responsePrefix) + 6
+			assert.Equal(t, expectedLength, len(responseString))
 		})
 	}
 }
