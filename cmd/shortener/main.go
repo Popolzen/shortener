@@ -21,7 +21,7 @@ func main() {
 	r.POST("/", handler.PostHandler(shortener, cfg))
 	r.GET("/:id", handler.GetHandler(shortener))
 
-	addr := cfg.Address()
+	addr := cfg.GetAddress()
 	log.Printf("URL Shortener запущен на http://%s", addr)
 
 	if err := r.Run(addr); err != nil {
