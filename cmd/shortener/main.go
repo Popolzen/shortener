@@ -3,20 +3,29 @@ package main
 import (
 	"log"
 
+	"github.com/Popolzen/shortener/internal/config"
 	"github.com/Popolzen/shortener/internal/handler"
+	"github.com/Popolzen/shortener/internal/repository/memory"
+	"github.com/Popolzen/shortener/internal/service/shortener"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	shortURLs := make(map[string]string)
+	gin.SetMode(gin.ReleaseMode)
+
+	cfg := config.NewConfig()
+	repo := memory.NewURLRepository()
+	shortener := shortener.NewURLService(repo)
 
 	r := gin.Default()
+	r.POST("/", handler.PostHandler(shortener, cfg))
+	r.GET("/:id", handler.GetHandler(shortener))
 
-	r.POST("/", handler.PostHandler(shortURLs))
-	r.GET("/:id", handler.GetHandler(shortURLs))
+	addr := cfg.Address()
+	log.Printf("URL Shortener запущен на http://%s", addr)
 
-	log.Println("Сервер запущен на порту 8080")
-	if err := r.Run(":8080"); err != nil {
+	if err := r.Run(addr); err != nil {
 		log.Fatal("Не удалось запустить сервер:", err)
 	}
+
 }
