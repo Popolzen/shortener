@@ -5,12 +5,20 @@ import (
 
 	"github.com/Popolzen/shortener/internal/config"
 	"github.com/Popolzen/shortener/internal/handler"
+	"github.com/Popolzen/shortener/internal/logger"
 	"github.com/Popolzen/shortener/internal/repository/memory"
 	"github.com/Popolzen/shortener/internal/service/shortener"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
+
+	// Инициализируем логгер
+	if err := logger.Init(); err != nil {
+		log.Fatal("Не удалось инициализировать логгер:", err)
+	}
+	defer logger.Close()
+
 	gin.SetMode(gin.ReleaseMode)
 
 	cfg := config.NewConfig()
@@ -18,6 +26,8 @@ func main() {
 	shortener := shortener.NewURLService(repo)
 
 	r := gin.Default()
+
+	r.Use(logger.RequestResponseLogger())
 	r.POST("/", handler.PostHandler(shortener, cfg))
 	r.GET("/:id", handler.GetHandler(shortener))
 
