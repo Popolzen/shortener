@@ -1,12 +1,14 @@
 package handler
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/Popolzen/shortener/internal/config"
+	"github.com/Popolzen/shortener/internal/model"
 	"github.com/Popolzen/shortener/internal/service/shortener"
 	"github.com/gin-gonic/gin"
 )
@@ -50,4 +52,31 @@ func GetHandler(urlService shortener.URLService) gin.HandlerFunc {
 		c.Header("Content-Type", "text/plain")
 		c.Status(http.StatusTemporaryRedirect)
 	}
+}
+
+// PostHandlerJSON создает короткую ссылку, принимает json, возвращает json.
+func PostHandlerJSON(urlService shortener.URLService, cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var request model.URL
+
+		if err := json.NewDecoder(c.Request.Body).Decode(&request); err != nil {
+			c.String(http.StatusBadRequest, "Неправильное тело запроса")
+			return
+		}
+		shortURL, err := urlService.Shorten(request.URL)
+		if err != nil {
+			c.String(http.StatusBadRequest, "Не удалось сгенерить короткую ссылку")
+			return
+		}
+
+		fullShortURL := cfg.BaseURL + "/" + shortURL
+
+		response := model.Result{
+			Result: fullShortURL,
+		}
+		c.Header("Content-Type", "application/json")
+		c.JSON(http.StatusCreated, response)
+		c.Header("Content-Length", strconv.Itoa(len(fullShortURL)))
+	}
+
 }
