@@ -3,7 +3,6 @@ package handler
 import (
 	"compress/gzip"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -85,30 +84,54 @@ func PostHandlerJSON(urlService shortener.URLService, cfg *config.Config) gin.Ha
 
 type gzipWriter struct {
 	gin.ResponseWriter
-	writer *gzip.Writer
+	writer     *gzip.Writer
+	compressed bool
 }
 
-func (g *gzipWriter) Write(data []byte) (int, error) {
+func (g *gzipWriter) Write(b []byte) (int, error) {
 	contentType := g.Header().Get("Content-Type")
-
-	if strings.Contains(contentType, "application/json") ||
-		strings.Contains(contentType, "text/html") {
-		g.Header().Set("Content-Encoding", "gzip")
-		return g.writer.Write(data)
+	if strings.Contains(contentType, "application/json") || strings.Contains(contentType, "text/html") {
+		if !g.compressed {
+			g.Header().Set("Content-Encoding", "gzip")
+			g.compressed = true
+		}
+		return g.writer.Write(b)
 	}
-	return g.ResponseWriter.Write(data)
-}
-func (g *gzipWriter) Close() error {
-	return g.writer.Close()
+	return g.ResponseWriter.Write(b)
 }
 
+func (g *gzipWriter) Close() error {
+	if g.compressed {
+		return g.writer.Close()
+	}
+	return nil
+}
+
+// CompressHandler обрабатывает gzip сжатие
 func CompressHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// 1. Распаковка входящего запроса
+		if strings.Contains(strings.ToLower(c.Request.Header.Get("Content-Encoding")), "gzip") {
+			newReader, err := gzip.NewReader(c.Request.Body)
+			if err != nil {
+				c.String(400, "Не удалось распаковать данные")
+				return
+			}
+			c.Request.Body = newReader
+			defer newReader.Close()
+		}
+
+		// 2. Подготовка сжатия ответа
 		acceptEncoding := c.Request.Header.Get("Accept-Encoding")
-		fmt.Printf("Accept-Encoding: '%s'\n", acceptEncoding)
-		fmt.Printf("Empty string contains gzip: %v\n", strings.Contains("", "gzip"))
-		fmt.Printf("AcceptEncoding != '': %v\n", acceptEncoding != "")
-		fmt.Printf("Should compress: %v\n", strings.Contains(strings.ToLower(acceptEncoding), "gzip") && acceptEncoding != "")
+		if strings.Contains(strings.ToLower(acceptEncoding), "gzip") && acceptEncoding != "" {
+			gzipResp := &gzipWriter{
+				ResponseWriter: c.Writer,
+				writer:         gzip.NewWriter(c.Writer),
+				compressed:     false,
+			}
+			c.Writer = gzipResp
+			defer gzipResp.Close()
+		}
 
 		c.Next()
 	}
