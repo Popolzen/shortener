@@ -28,6 +28,7 @@ func main() {
 	r := gin.Default()
 
 	r.Use(logger.RequestResponseLogger())
+	r.Use(handler.CompressHandler())
 	r.POST("/", handler.PostHandler(shortener, cfg))
 	r.POST("/api/shorten", handler.PostHandlerJSON(shortener, cfg))
 	r.GET("/:id", handler.GetHandler(shortener))

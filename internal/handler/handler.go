@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -79,4 +80,58 @@ func PostHandlerJSON(urlService shortener.URLService, cfg *config.Config) gin.Ha
 		c.Header("Content-Length", strconv.Itoa(len(fullShortURL)))
 	}
 
+}
+
+type gzipWriter struct {
+	gin.ResponseWriter
+	writer *gzip.Writer
+}
+
+func (g *gzipWriter) Write(data []byte) (int, error) {
+	return g.writer.Write(data)
+}
+
+func (g *gzipWriter) Close() error {
+	return g.writer.Close()
+}
+
+// CompressHandler - разжимает закодированные данные и сжимает ответ
+func CompressHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if strings.Contains(c.Request.Header.Get("Content-Encoding"), "gzip") {
+			newReader, err := gzip.NewReader(c.Request.Body)
+			if err != nil {
+				c.String(http.StatusBadRequest, "Не удалось распокавать данные")
+				return
+			}
+			c.Request.Body = newReader
+			defer newReader.Close()
+
+		}
+
+		acceptEncoding := c.Request.Header.Get("Accept-Encoding")
+		var gzipResponseWriter *gzipWriter
+
+		if strings.Contains(acceptEncoding, "gzip") {
+			gzipResponseWriter = &gzipWriter{
+				ResponseWriter: c.Writer,
+				writer:         gzip.NewWriter(c.Writer),
+			}
+
+			c.Writer = gzipResponseWriter
+			c.Header("Content-Encoding", "gzip")
+		}
+
+		c.Next()
+		if gzipResponseWriter != nil {
+			contentType := c.GetHeader("Content-Type")
+
+			if contentType == "application/json" || contentType == "text/html" {
+				gzipResponseWriter.Close()
+			} else {
+				// Если тип не подходит, убираем заголовок
+				c.Header("Content-Encoding", "")
+			}
+		}
+	}
 }
