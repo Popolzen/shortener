@@ -3,6 +3,7 @@ package handler
 import (
 	"compress/gzip"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -89,6 +90,7 @@ type gzipWriter struct {
 
 func (g *gzipWriter) Write(data []byte) (int, error) {
 	contentType := g.Header().Get("Content-Type")
+
 	if strings.Contains(contentType, "application/json") ||
 		strings.Contains(contentType, "text/html") {
 		g.Header().Set("Content-Encoding", "gzip")
@@ -100,35 +102,14 @@ func (g *gzipWriter) Close() error {
 	return g.writer.Close()
 }
 
-// CompressHandler - разжимает закодированные данные и сжимает ответ
 func CompressHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if strings.Contains(c.Request.Header.Get("Content-Encoding"), "gzip") { // Проверяем что сжаты
-			newReader, err := gzip.NewReader(c.Request.Body)
-			if err != nil {
-				c.String(http.StatusBadRequest, "Не удалось распокавать данные")
-				return
-			}
-			c.Request.Body = newReader
-			defer newReader.Close()
-
-		}
-		c.Next()
 		acceptEncoding := c.Request.Header.Get("Accept-Encoding")
-		var gzipResponseWriter *gzipWriter
+		fmt.Printf("Accept-Encoding: '%s'\n", acceptEncoding)
+		fmt.Printf("Empty string contains gzip: %v\n", strings.Contains("", "gzip"))
+		fmt.Printf("AcceptEncoding != '': %v\n", acceptEncoding != "")
+		fmt.Printf("Should compress: %v\n", strings.Contains(strings.ToLower(acceptEncoding), "gzip") && acceptEncoding != "")
 
-		if strings.Contains(acceptEncoding, "gzip") {
-			gzipResponseWriter = &gzipWriter{
-				ResponseWriter: c.Writer,
-				writer:         gzip.NewWriter(c.Writer),
-			}
-			c.Writer = gzipResponseWriter
-			c.Header("Content-Encoding", "gzip")
-		}
-
-		if gzipResponseWriter != nil {
-			gzipResponseWriter.Close()
-
-		}
+		c.Next()
 	}
 }
