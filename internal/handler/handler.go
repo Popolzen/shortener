@@ -108,7 +108,7 @@ func CompressHandler() gin.HandlerFunc {
 			defer newReader.Close()
 
 		}
-
+		c.Next()
 		acceptEncoding := c.Request.Header.Get("Accept-Encoding")
 		var gzipResponseWriter *gzipWriter
 
@@ -119,15 +119,14 @@ func CompressHandler() gin.HandlerFunc {
 			}
 
 			c.Writer = gzipResponseWriter
+			c.Header("Content-Encoding", "gzip")
 		}
 
-		c.Next()
 		if gzipResponseWriter != nil {
 			contentType := c.GetHeader("Content-Type")
 
 			if contentType == "application/json" || contentType == "text/html" {
 				gzipResponseWriter.Close()
-				c.Header("Content-Encoding", "gzip")
 			} else {
 				// Если тип не подходит, убираем заголовок
 				c.Header("Content-Encoding", "")
