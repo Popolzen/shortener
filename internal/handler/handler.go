@@ -127,6 +127,7 @@ func CompressHandler() gin.HandlerFunc {
 
 			if contentType == "application/json" || contentType == "text/html" {
 				gzipResponseWriter.Close()
+				c.Header("Content-Encoding", "gzip")
 			} else {
 				// Если тип не подходит, убираем заголовок
 				c.Header("Content-Encoding", "")
