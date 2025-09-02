@@ -91,6 +91,7 @@ func (g *gzipWriter) Write(data []byte) (int, error) {
 	contentType := g.Header().Get("Content-Type")
 	if strings.Contains(contentType, "application/json") ||
 		strings.Contains(contentType, "text/html") {
+		g.Header().Set("Content-Encoding", "gzip")
 		return g.writer.Write(data)
 	}
 	return g.ResponseWriter.Write(data)
@@ -121,7 +122,6 @@ func CompressHandler() gin.HandlerFunc {
 				ResponseWriter: c.Writer,
 				writer:         gzip.NewWriter(c.Writer),
 			}
-
 			c.Writer = gzipResponseWriter
 			c.Header("Content-Encoding", "gzip")
 		}
