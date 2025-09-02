@@ -98,7 +98,7 @@ func (g *gzipWriter) Close() error {
 // CompressHandler - разжимает закодированные данные и сжимает ответ
 func CompressHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if strings.Contains(c.Request.Header.Get("Content-Encoding"), "gzip") {
+		if strings.Contains(c.Request.Header.Get("Content-Encoding"), "gzip") { // Проверяем что сжаты
 			newReader, err := gzip.NewReader(c.Request.Body)
 			if err != nil {
 				c.String(http.StatusBadRequest, "Не удалось распокавать данные")
@@ -119,7 +119,6 @@ func CompressHandler() gin.HandlerFunc {
 			}
 
 			c.Writer = gzipResponseWriter
-			c.Header("Content-Encoding", "gzip")
 		}
 
 		c.Next()
