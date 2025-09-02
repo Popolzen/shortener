@@ -127,14 +127,8 @@ func CompressHandler() gin.HandlerFunc {
 		}
 
 		if gzipResponseWriter != nil {
-			contentType := c.GetHeader("Content-Type")
+			gzipResponseWriter.Close()
 
-			if contentType == "application/json" || contentType == "text/html" {
-				gzipResponseWriter.Close()
-			} else {
-				// Если тип не подходит, убираем заголовок
-				c.Header("Content-Encoding", "")
-			}
 		}
 	}
 }
