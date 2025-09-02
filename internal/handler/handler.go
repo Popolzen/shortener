@@ -114,7 +114,7 @@ func CompressHandler() gin.HandlerFunc {
 		if strings.Contains(strings.ToLower(c.Request.Header.Get("Content-Encoding")), "gzip") {
 			newReader, err := gzip.NewReader(c.Request.Body)
 			if err != nil {
-				c.String(400, "Не удалось распаковать данные")
+				c.String(http.StatusBadRequest, "Не удалось распаковать данные")
 				return
 			}
 			c.Request.Body = newReader
