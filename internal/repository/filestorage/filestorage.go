@@ -32,7 +32,7 @@ func (r *urlRepository) Store(shortURL, longURL string) error {
 	urlRecord.ShortURL = shortURL
 	urlRecord.OriginalURL = longURL
 
-	r.saveUrlToFile(r.path, urlRecord)
+	r.saveURLToFile(r.path, urlRecord)
 	return nil
 }
 
@@ -93,8 +93,8 @@ func (r *urlRepository) loadURLs(path string) error {
 	return nil
 }
 
-// saveUrlToFile  запись по url в файл
-func (r *urlRepository) saveUrlToFile(path string, url model.URLRecord) error {
+// saveURLToFile  запись по url в файл
+func (r *urlRepository) saveURLToFile(path string, url model.URLRecord) error {
 	data, err := json.Marshal(url)
 	if err != nil {
 		return fmt.Errorf("ошибка сериализации JSON: %w", err)
