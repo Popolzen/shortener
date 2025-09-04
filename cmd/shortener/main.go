@@ -6,7 +6,7 @@ import (
 	"github.com/Popolzen/shortener/internal/config"
 	"github.com/Popolzen/shortener/internal/handler"
 	"github.com/Popolzen/shortener/internal/logger"
-	"github.com/Popolzen/shortener/internal/repository/memory"
+	"github.com/Popolzen/shortener/internal/repository/filestorage"
 	"github.com/Popolzen/shortener/internal/service/shortener"
 	"github.com/gin-gonic/gin"
 )
@@ -22,7 +22,7 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 
 	cfg := config.NewConfig()
-	repo := memory.NewURLRepository()
+	repo := filestorage.NewURLRepository(cfg.GetFilePath())
 	shortener := shortener.NewURLService(repo)
 
 	r := gin.Default()
@@ -33,7 +33,7 @@ func main() {
 	r.POST("/api/shorten", handler.PostHandlerJSON(shortener, cfg))
 	r.GET("/:id", handler.GetHandler(shortener))
 
-	addr := cfg.Address()
+	addr := cfg.GetAddress()
 	log.Printf("URL Shortener запущен на http://%s", addr)
 
 	if err := r.Run(addr); err != nil {
