@@ -33,7 +33,7 @@ func (r *urlRepository) Store(shortURL, longURL string) error {
 func NewURLRepository(path string) *urlRepository {
 	var repo urlRepository
 
-	repo.setPath(path)
+	repo.path = path
 	repo.urls = map[string]string{}
 
 	err := repo.loadURLs(path)
@@ -94,9 +94,4 @@ func (r *urlRepository) SaveURLToFile() error {
 	file.Write(data)
 
 	return nil
-}
-
-// Устанавливаем путь
-func (r *urlRepository) setPath(path string) {
-	r.path = path
 }
