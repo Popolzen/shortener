@@ -30,8 +30,8 @@ func Init() error {
 	return nil
 }
 
-// RequestResponseLogger — middleware-логер для входящих HTTP-запросов.
-func RequestResponseLogger() gin.HandlerFunc {
+// RequestLogger — middleware-логер для входящих HTTP-запросов.
+func RequestLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		start := time.Now()

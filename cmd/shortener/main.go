@@ -1,11 +1,16 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/Popolzen/shortener/internal/config"
 	"github.com/Popolzen/shortener/internal/handler"
-	"github.com/Popolzen/shortener/internal/logger"
+	"github.com/Popolzen/shortener/internal/middleware/compressor"
+	"github.com/Popolzen/shortener/internal/middleware/logger"
 	"github.com/Popolzen/shortener/internal/repository/filestorage"
 	"github.com/Popolzen/shortener/internal/service/shortener"
 	"github.com/gin-gonic/gin"
@@ -27,11 +32,26 @@ func main() {
 
 	r := gin.Default()
 
-	r.Use(logger.RequestResponseLogger())
-	r.Use(handler.CompressHandler())
+	r.Use(logger.RequestLogger())
+	r.Use(compressor.Compresser())
 	r.POST("/", handler.PostHandler(shortener, cfg))
 	r.POST("/api/shorten", handler.PostHandlerJSON(shortener, cfg))
 	r.GET("/:id", handler.GetHandler(shortener))
+
+	// Обработка сигналов SIGINT и SIGTERM
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		<-sigChan
+		fmt.Println("\nПолучен сигнал остановки, сохраняем данные...")
+		if err := repo.SaveURLToFile(); err != nil {
+			log.Printf("Ошибка сохранения при завершении: %v", err)
+			os.Exit(1)
+		}
+		fmt.Println("Данные сохранены, программа завершена.")
+		os.Exit(0)
+	}()
 
 	addr := cfg.GetAddress()
 	log.Printf("URL Shortener запущен на http://%s", addr)
