@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/Popolzen/shortener/internal/config"
+	"github.com/Popolzen/shortener/internal/config/db"
 	"github.com/Popolzen/shortener/internal/handler"
 	"github.com/Popolzen/shortener/internal/middleware/compressor"
 	"github.com/Popolzen/shortener/internal/middleware/logger"
@@ -26,7 +27,7 @@ func main() {
 
 	gin.SetMode(gin.ReleaseMode)
 
-	// dbCfg := db.NewDBConfig()
+	dbCfg := db.NewDBConfig()
 	cfg := config.NewConfig()
 	repo := filestorage.NewURLRepository(cfg.GetFilePath())
 	shortener := shortener.NewURLService(repo)
@@ -38,7 +39,7 @@ func main() {
 	r.POST("/", handler.PostHandler(shortener, cfg))
 	r.POST("/api/shorten", handler.PostHandlerJSON(shortener, cfg))
 	r.GET("/:id", handler.GetHandler(shortener))
-	// r.GET("/ping", handler.PingHandler(dbCfg))
+	r.GET("/ping", handler.PingHandler(dbCfg))
 
 	// Обработка сигналов SIGINT и SIGTERM
 	sigChan := make(chan os.Signal, 1)

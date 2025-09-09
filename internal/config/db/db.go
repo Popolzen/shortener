@@ -48,7 +48,7 @@ func (d *DBConfig) PingDB() error {
 }
 
 func (c *DBConfig) getArgsFromCli() {
-	flag.StringVar(&c.DBurl, "d", "", "db")
+	flag.StringVar(&c.DBurl, "d", "", "database url")
 
 	flag.Parse()
 }
