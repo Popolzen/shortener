@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/Popolzen/shortener/internal/config/config"
+	"github.com/Popolzen/shortener/internal/config"
 	"github.com/Popolzen/shortener/internal/config/db"
 	"github.com/Popolzen/shortener/internal/handler"
 	"github.com/Popolzen/shortener/internal/middleware/compressor"

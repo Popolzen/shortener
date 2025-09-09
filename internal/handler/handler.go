@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Popolzen/shortener/internal/config/config"
+	"github.com/Popolzen/shortener/internal/config"
 	"github.com/Popolzen/shortener/internal/config/db"
 	"github.com/Popolzen/shortener/internal/model"
 	"github.com/Popolzen/shortener/internal/service/shortener"

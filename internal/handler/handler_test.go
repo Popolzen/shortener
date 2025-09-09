@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Popolzen/shortener/internal/config/config"
+	"github.com/Popolzen/shortener/internal/config"
 	"github.com/Popolzen/shortener/internal/repository/memory"
 	"github.com/Popolzen/shortener/internal/service/shortener"
 	"github.com/gin-gonic/gin"
