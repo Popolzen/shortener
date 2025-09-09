@@ -39,7 +39,7 @@ func main() {
 	r.POST("/", handler.PostHandler(shortener, cfg))
 	r.POST("/api/shorten", handler.PostHandlerJSON(shortener, cfg))
 	r.GET("/:id", handler.GetHandler(shortener))
-	r.GET("/ping", handler.PingHandler(dbCfg))
+	// r.GET("/ping", handler.PingHandler(dbCfg))
 
 	// Обработка сигналов SIGINT и SIGTERM
 	sigChan := make(chan os.Signal, 1)
