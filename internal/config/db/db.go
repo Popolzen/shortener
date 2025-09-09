@@ -11,7 +11,7 @@ import (
 
 // DBConfig содержит конфигурацию для подключения к БД
 type DBConfig struct {
-	DBurl string `env:"DATABASE_DSN"`
+	DBurl string
 }
 
 // DataBase представляет подключение к базе данных

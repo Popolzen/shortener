@@ -24,7 +24,7 @@ func (c *Config) getArgsFromCli() {
 	flag.StringVar(&c.ServerAddr, "a", DefaultServerAddr, "server host")
 	flag.StringVar(&c.BaseURL, "b", DefaultBaseURL, "base url for short links")
 	flag.StringVar(&c.FilePath, "f", DefaultFilePath, "file storage path")
-	flag.StringVar(&c.FilePath, "d", "", "file storage path")
+	flag.StringVar(&c.DBurl, "d", "", "DBurl")
 	flag.Parse()
 }
 
