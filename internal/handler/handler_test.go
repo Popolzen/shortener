@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Popolzen/shortener/internal/config/server"
+	"github.com/Popolzen/shortener/internal/config/config"
 	"github.com/Popolzen/shortener/internal/repository/memory"
 	"github.com/Popolzen/shortener/internal/service/shortener"
 	"github.com/gin-gonic/gin"
@@ -135,7 +135,7 @@ func TestPostHandler(t *testing.T) {
 
 			// Настройка роутера
 			router := gin.New()
-			router.POST("/", PostHandler(urlService, &server.ServerConfig{BaseURL: "http://localhost:8080"}))
+			router.POST("/", PostHandler(urlService, &config.ServerConfig{BaseURL: "http://localhost:8080"}))
 
 			// Создание запроса
 			req := httptest.NewRequest(tt.method, "/", strings.NewReader(tt.request))
