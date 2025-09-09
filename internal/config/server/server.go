@@ -1,4 +1,4 @@
-package config
+package server
 
 import (
 	"flag"
@@ -13,27 +13,27 @@ const (
 	DefaultFilePath   = "storage.json"
 )
 
-type Config struct {
+type ServerConfig struct {
 	ServerAddr string `env:"SERVER_ADDRESS"`
 	BaseURL    string `env:"BASE_URL"`
 	FilePath   string `env:"FILE_STORAGE_PATH"`
 }
 
-func (c *Config) getArgsFromCli() {
+func (c *ServerConfig) getArgsFromCli() {
 	flag.StringVar(&c.ServerAddr, "a", DefaultServerAddr, "server host")
 	flag.StringVar(&c.BaseURL, "b", DefaultBaseURL, "base url for short links")
 	flag.StringVar(&c.FilePath, "f", DefaultFilePath, "file storage path")
 	flag.Parse()
 }
 
-func (c *Config) getArgsFromEnv() {
+func (c *ServerConfig) getArgsFromEnv() {
 	if err := env.Parse(c); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func NewConfig() *Config {
-	c := &Config{
+func NewConfig() *ServerConfig {
+	c := &ServerConfig{
 		ServerAddr: DefaultServerAddr,
 		BaseURL:    DefaultBaseURL,
 		FilePath:   DefaultFilePath,
@@ -44,14 +44,14 @@ func NewConfig() *Config {
 }
 
 // Возвращает полнгый адрес сервера
-func (c Config) GetAddress() string {
+func (c ServerConfig) GetAddress() string {
 	return c.ServerAddr
 }
 
-func (c Config) GetBaseURL() string {
+func (c ServerConfig) GetBaseURL() string {
 	return c.BaseURL
 }
 
-func (c Config) GetFilePath() string {
+func (c ServerConfig) GetFilePath() string {
 	return c.FilePath
 }

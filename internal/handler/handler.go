@@ -7,14 +7,15 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Popolzen/shortener/internal/config"
+	"github.com/Popolzen/shortener/internal/config/db"
+	"github.com/Popolzen/shortener/internal/config/server"
 	"github.com/Popolzen/shortener/internal/model"
 	"github.com/Popolzen/shortener/internal/service/shortener"
 	"github.com/gin-gonic/gin"
 )
 
 // PostHandler создает короткую ссылку
-func PostHandler(urlService shortener.URLService, cfg *config.Config) gin.HandlerFunc {
+func PostHandler(urlService shortener.URLService, cfg *server.ServerConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Читаем тело запроса
 		body, err := io.ReadAll(c.Request.Body)
@@ -55,7 +56,7 @@ func GetHandler(urlService shortener.URLService) gin.HandlerFunc {
 }
 
 // PostHandlerJSON создает короткую ссылку, принимает json, возвращает json.
-func PostHandlerJSON(urlService shortener.URLService, cfg *config.Config) gin.HandlerFunc {
+func PostHandlerJSON(urlService shortener.URLService, cfg *server.ServerConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var request model.URL
 
@@ -79,4 +80,15 @@ func PostHandlerJSON(urlService shortener.URLService, cfg *config.Config) gin.Ha
 		c.Header("Content-Length", strconv.Itoa(len(fullShortURL)))
 	}
 
+}
+
+// PingHandler - хэндлер пинга.
+func PingHandler(dbconf db.DBConfig) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		err := dbconf.PingDB()
+		if err != nil {
+			ctx.Status(http.StatusInternalServerError)
+		}
+		ctx.Status(http.StatusOK)
+	}
 }
