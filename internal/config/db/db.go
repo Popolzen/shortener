@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 
 	"github.com/Popolzen/shortener/internal/config"
@@ -10,7 +11,7 @@ import (
 
 // DBConfig содержит конфигурацию для подключения к БД
 type DBConfig struct {
-	DBurl string `env:"DATABASE_DSN"`
+	DBurl string `env:"DATABASE_CONN_STRING"`
 }
 
 // DataBase представляет подключение к базе данных
@@ -21,6 +22,7 @@ type DataBase struct {
 
 // NewDBConfig создает новую конфигурацию БД
 func NewDBConfig(c config.Config) DBConfig {
+	fmt.Print("Строка коннекта", c.DBurl)
 	return DBConfig{
 		DBurl: c.DBurl,
 	}
