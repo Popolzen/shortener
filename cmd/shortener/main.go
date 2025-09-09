@@ -27,8 +27,9 @@ func main() {
 
 	gin.SetMode(gin.ReleaseMode)
 
-	dbCfg := db.NewDBConfig()
 	cfg := config.NewConfig()
+	dbCfg := db.NewDBConfig(*cfg)
+
 	repo := filestorage.NewURLRepository(cfg.GetFilePath())
 	shortener := shortener.NewURLService(repo)
 

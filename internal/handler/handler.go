@@ -15,7 +15,7 @@ import (
 )
 
 // PostHandler создает короткую ссылку
-func PostHandler(urlService shortener.URLService, cfg *config.ServerConfig) gin.HandlerFunc {
+func PostHandler(urlService shortener.URLService, cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Читаем тело запроса
 		body, err := io.ReadAll(c.Request.Body)
@@ -56,7 +56,7 @@ func GetHandler(urlService shortener.URLService) gin.HandlerFunc {
 }
 
 // PostHandlerJSON создает короткую ссылку, принимает json, возвращает json.
-func PostHandlerJSON(urlService shortener.URLService, cfg *config.ServerConfig) gin.HandlerFunc {
+func PostHandlerJSON(urlService shortener.URLService, cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var request model.URL
 

@@ -2,10 +2,9 @@ package db
 
 import (
 	"database/sql"
-	"flag"
 	"log"
 
-	"github.com/caarlos0/env"
+	"github.com/Popolzen/shortener/internal/config"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -21,12 +20,10 @@ type DataBase struct {
 }
 
 // NewDBConfig создает новую конфигурацию БД
-func NewDBConfig() DBConfig {
-	c := DBConfig{}
-
-	c.getArgsFromCli()
-	c.getArgsFromEnv()
-	return c
+func NewDBConfig(c config.Config) DBConfig {
+	return DBConfig{
+		DBurl: c.DBurl,
+	}
 }
 
 // PingDB проверяет подключение к базе данных (без создания постоянного соединения)
@@ -45,20 +42,4 @@ func (d *DBConfig) PingDB() error {
 	}
 
 	return nil
-}
-
-func (c *DBConfig) getArgsFromCli() {
-	flag.StringVar(&c.DBurl, "d", "", "database url")
-
-	flag.Parse()
-}
-
-func (c *DBConfig) getArgsFromEnv() {
-	if err := env.Parse(c); err != nil {
-		log.Fatal(err)
-	}
-}
-
-func (c *DBConfig) IsEmpty() bool {
-	return c.DBurl == ""
 }

@@ -135,7 +135,7 @@ func TestPostHandler(t *testing.T) {
 
 			// Настройка роутера
 			router := gin.New()
-			router.POST("/", PostHandler(urlService, &config.ServerConfig{BaseURL: "http://localhost:8080"}))
+			router.POST("/", PostHandler(urlService, &config.Config{BaseURL: "http://localhost:8080"}))
 
 			// Создание запроса
 			req := httptest.NewRequest(tt.method, "/", strings.NewReader(tt.request))
