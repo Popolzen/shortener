@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/Popolzen/shortener/internal/config"
+	migration "github.com/Popolzen/shortener/migrations"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -28,6 +29,19 @@ func NewDBConfig(c config.Config) DBConfig {
 	}
 }
 
+// NewDataBase создает абстракцию БД
+func NewDataBase(c config.Config) (*DataBase, error) {
+	cfg := NewDBConfig(c)
+	db, err := sql.Open("pgx", cfg.DBurl)
+	if err != nil {
+		return nil, fmt.Errorf("не удалось открыть подключение: %w", err)
+	}
+	return &DataBase{
+		DB:     db,
+		config: &cfg,
+	}, nil
+}
+
 // PingDB проверяет подключение к базе данных (без создания постоянного соединения)
 func (d *DBConfig) PingDB() error {
 	db, err := sql.Open("pgx", d.DBurl)
@@ -44,4 +58,8 @@ func (d *DBConfig) PingDB() error {
 	}
 
 	return nil
+}
+
+func (d *DataBase) Migrate() error {
+	return migration.MigrateUp(d.DB)
 }

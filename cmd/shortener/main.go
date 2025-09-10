@@ -33,6 +33,11 @@ func main() {
 	repo := filestorage.NewURLRepository(cfg.GetFilePath())
 	shortener := shortener.NewURLService(repo)
 
+	db, err := db.NewDataBase(*cfg)
+	fmt.Print(err)
+	err = db.Migrate()
+	fmt.Print(err)
+
 	r := gin.Default()
 
 	r.Use(logger.RequestLogger())
