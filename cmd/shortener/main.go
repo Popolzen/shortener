@@ -38,15 +38,20 @@ func main() {
 		}
 
 		if err := dbInstance.Migrate(); err != nil {
-			log.Printf("Ошибка выполнения миграций:", err)
+			log.Println("Ошибка выполнения миграций:", err)
 		}
 
 		repo = database.NewURLRepository(dbInstance.DB)
 
+		log.Println("Используется БД репозиторий")
 	case cfg.GetFilePath() != "":
 		repo = filestorage.NewURLRepository(cfg.GetFilePath())
+
+		log.Println("Используется файл")
 	default:
 		repo = memory.NewURLRepository()
+
+		log.Println("Используется память")
 	}
 	// repo := filestorage.NewURLRepository(cfg.GetFilePath())
 	shortener := shortener.NewURLService(repo)
