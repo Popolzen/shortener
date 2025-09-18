@@ -23,22 +23,21 @@ type Database struct {
 
 // NewDBConfig создает новую конфигурацию БД
 func NewDBConfig(c config.Config) DBConfig {
-	fmt.Print("Строка коннекта", c.DBurl)
+	fmt.Println("Строка коннекта", c.DBurl)
 	return DBConfig{
 		DBurl: c.DBurl,
 	}
 }
 
 // NewDataBase создает абстракцию БД
-func NewDataBase(c config.Config) (*Database, error) {
-	cfg := NewDBConfig(c)
-	db, err := sql.Open("pgx", cfg.DBurl)
+func NewDataBase(c config.Config, dbConf DBConfig) (*Database, error) {
+	db, err := sql.Open("pgx", dbConf.DBurl)
 	if err != nil {
 		return nil, fmt.Errorf("не удалось открыть подключение: %w", err)
 	}
 	return &Database{
 		DB:     db,
-		config: &cfg,
+		config: &dbConf,
 	}, nil
 }
 

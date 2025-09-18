@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/Popolzen/shortener/internal/config"
@@ -27,18 +28,21 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 
 	cfg := config.NewConfig()
+	cfg.DBurl = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+		`localhost`, 5432, `postgres`, `123456`, `shortener`)
+
 	dbCfg := db.NewDBConfig(*cfg)
 
 	switch {
 	case dbCfg.DBurl != "":
 
-		dbInstance, err := db.NewDataBase(*cfg)
+		dbInstance, err := db.NewDataBase(*cfg, dbCfg)
 		if err != nil {
 			log.Fatal("Ошибка подключения к БД:", err)
 		}
 
 		if err := dbInstance.Migrate(); err != nil {
-			log.Println("Ошибка выполнения миграций:", err)
+			log.Fatal("Ошибка выполнения миграций:", err)
 		}
 
 		repo = database.NewURLRepository(dbInstance.DB)
@@ -53,7 +57,7 @@ func main() {
 
 		log.Println("Используется память")
 	}
-	// repo := filestorage.NewURLRepository(cfg.GetFilePath())
+
 	shortener := shortener.NewURLService(repo)
 	r := gin.Default()
 
