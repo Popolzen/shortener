@@ -15,8 +15,8 @@ type DBConfig struct {
 	DBurl string
 }
 
-// DataBase представляет подключение к базе данных
-type DataBase struct {
+// Database представляет подключение к базе данных
+type Database struct {
 	*sql.DB
 	config *DBConfig
 }
@@ -30,13 +30,13 @@ func NewDBConfig(c config.Config) DBConfig {
 }
 
 // NewDataBase создает абстракцию БД
-func NewDataBase(c config.Config) (*DataBase, error) {
+func NewDataBase(c config.Config) (*Database, error) {
 	cfg := NewDBConfig(c)
 	db, err := sql.Open("pgx", cfg.DBurl)
 	if err != nil {
 		return nil, fmt.Errorf("не удалось открыть подключение: %w", err)
 	}
-	return &DataBase{
+	return &Database{
 		DB:     db,
 		config: &cfg,
 	}, nil
@@ -60,6 +60,6 @@ func (d *DBConfig) PingDB() error {
 	return nil
 }
 
-func (d *DataBase) Migrate() error {
+func (d *Database) Migrate() error {
 	return migration.MigrateUp(d.DB)
 }
