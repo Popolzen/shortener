@@ -64,6 +64,7 @@ func main() {
 	r.Use(compressor.Compresser())
 	r.POST("/", handler.PostHandler(shortener, cfg))
 	r.POST("/api/shorten", handler.PostHandlerJSON(shortener, cfg))
+	r.POST("/api/shorten/batch", handler.BatchHandler(shortener, cfg))
 	r.GET("/:id", handler.GetHandler(shortener))
 	r.GET("/ping", handler.PingHandler(dbCfg))
 

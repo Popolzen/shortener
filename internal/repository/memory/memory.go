@@ -3,7 +3,8 @@ package memory
 import "fmt"
 
 type urlRepository struct {
-	urls map[string]string
+	urls         map[string]string
+	correlations map[string]string
 }
 
 func (r urlRepository) Get(shortURL string) (string, error) {
@@ -21,6 +22,11 @@ func (r *urlRepository) Store(shortURL, longURL string) error {
 
 func NewURLRepository() *urlRepository {
 	return &urlRepository{
-		urls: map[string]string{},
+		urls:         map[string]string{},
+		correlations: map[string]string{},
 	}
+}
+
+func (r *urlRepository) StoreBatch() {
+
 }

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -91,4 +92,47 @@ func PingHandler(dbconf db.DBConfig) gin.HandlerFunc {
 		}
 		ctx.Status(http.StatusOK)
 	}
+}
+
+// BatchHandler - хэндрер батчей
+func BatchHandler(urlService shortener.URLService, cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		var requestBatch []model.URLBatchRequest
+		var responseBatch []model.URLBatchResponse
+
+		if err := json.NewDecoder(c.Request.Body).Decode(&requestBatch); err != nil {
+			c.String(http.StatusBadRequest, "Неправильное тело запроса")
+			return
+		}
+
+		// Красивый вывод для дебага
+		if debugJSON, err := json.MarshalIndent(requestBatch, "", "  "); err == nil {
+			fmt.Printf("DEBUG RequestBatch:\n%s\n", string(debugJSON))
+		}
+
+		responseBatch, err := shortenBatch(requestBatch, urlService)
+
+		if err != nil {
+			c.String(http.StatusBadRequest, "Не удалось сгенерить короткую ссылку")
+			return
+		}
+
+		c.Header("Content-Type", "application/json")
+		c.JSON(http.StatusCreated, responseBatch)
+		c.Header("Content-Length", strconv.Itoa(len(responseBatch)))
+
+	}
+}
+
+func shortenBatch(req []model.URLBatchRequest, urlService shortener.URLService) ([]model.URLBatchResponse, error) {
+	response := make([]model.URLBatchResponse, 0, len(req))
+	for _, request := range req {
+		shortURL, err := urlService.Shorten(request.OriginalURL)
+		if err != nil {
+			return nil, err
+		}
+		response = append(response, model.URLBatchResponse{CorrelationID: request.CorrelationID, ShortURL: shortURL})
+	}
+	return response, nil
 }
