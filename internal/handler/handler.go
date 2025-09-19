@@ -111,7 +111,7 @@ func BatchHandler(urlService shortener.URLService, cfg *config.Config) gin.Handl
 			fmt.Printf("DEBUG RequestBatch:\n%s\n", string(debugJSON))
 		}
 
-		responseBatch, err := shortenBatch(requestBatch, urlService)
+		responseBatch, err := shortenBatch(requestBatch, urlService, cfg.GetBaseURL())
 
 		if err != nil {
 			c.String(http.StatusBadRequest, "Не удалось сгенерить короткую ссылку")
@@ -125,14 +125,14 @@ func BatchHandler(urlService shortener.URLService, cfg *config.Config) gin.Handl
 	}
 }
 
-func shortenBatch(req []model.URLBatchRequest, urlService shortener.URLService) ([]model.URLBatchResponse, error) {
+func shortenBatch(req []model.URLBatchRequest, urlService shortener.URLService, baseUrl string) ([]model.URLBatchResponse, error) {
 	response := make([]model.URLBatchResponse, 0, len(req))
 	for _, request := range req {
 		shortURL, err := urlService.Shorten(request.OriginalURL)
 		if err != nil {
 			return nil, err
 		}
-		response = append(response, model.URLBatchResponse{CorrelationID: request.CorrelationID, ShortURL: shortURL})
+		response = append(response, model.URLBatchResponse{CorrelationID: request.CorrelationID, ShortURL: baseUrl + "/" + shortURL})
 	}
 	return response, nil
 }

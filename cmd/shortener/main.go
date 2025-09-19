@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/Popolzen/shortener/internal/config"
@@ -27,8 +28,8 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 
 	cfg := config.NewConfig()
-	// cfg.DBurl = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-	// 	`localhost`, 5432, `postgres`, `123456`, `shortener`)
+	cfg.DBurl = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+		`localhost`, 5432, `postgres`, `123456`, `shortener`)
 
 	dbCfg := db.NewDBConfig(*cfg)
 
