@@ -149,14 +149,15 @@ func BatchHandler(urlService shortener.URLService, cfg *config.Config) gin.Handl
 	}
 }
 
-func shortenBatch(req []model.URLBatchRequest, urlService shortener.URLService, baseUrl string) ([]model.URLBatchResponse, error) {
+// shortenBatch сокращает батч ссылок
+func shortenBatch(req []model.URLBatchRequest, urlService shortener.URLService, baseURL string) ([]model.URLBatchResponse, error) {
 	response := make([]model.URLBatchResponse, 0, len(req))
 	for _, request := range req {
 		shortURL, err := urlService.Shorten(request.OriginalURL)
 		if err != nil {
 			return nil, err
 		}
-		response = append(response, model.URLBatchResponse{CorrelationID: request.CorrelationID, ShortURL: baseUrl + "/" + shortURL})
+		response = append(response, model.URLBatchResponse{CorrelationID: request.CorrelationID, ShortURL: baseURL + "/" + shortURL})
 	}
 	return response, nil
 }
