@@ -2,9 +2,21 @@ package database
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
+
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
 )
+
+type URLConflictError struct {
+	ExistingShortURL string
+}
+
+func (e URLConflictError) Error() string {
+	return fmt.Sprintf("URL уже существует с коротким URL: %s", e.ExistingShortURL)
+}
 
 type urlRepository struct {
 	DB *sql.DB
@@ -26,19 +38,41 @@ func (r *urlRepository) Get(shortURL string) (string, error) {
 	return longURL, nil
 }
 
+// getByLongURL получает короткий URL по длинному
+func (r *urlRepository) getByLongURL(longURL string) (string, error) {
+	var shortURL string
+	query := `SELECT short_url FROM shortened_urls WHERE long_url = $1`
+	err := r.DB.QueryRow(query, longURL).Scan(&shortURL)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", fmt.Errorf("URL not found")
+		}
+		return "", fmt.Errorf("ошибка при получении короткого URL: %w", err)
+	}
+	return shortURL, nil
+}
+
 // Store сохраняет соответствие короткого и длинного URL
 func (r *urlRepository) Store(shortURL, longURL string) error {
 	query := `
     INSERT INTO shortened_urls (short_url, long_url, created_at)
     VALUES ($1, $2, $3)
-    ON CONFLICT (short_url)
-    DO UPDATE SET
-        long_url = EXCLUDED.long_url
+
 `
 
 	now := time.Now()
 	_, err := r.DB.Exec(query, shortURL, longURL, now)
 	if err != nil {
+
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+			existingShortURL, getErr := r.getByLongURL(longURL)
+			if getErr != nil {
+				return fmt.Errorf("ошибка при получении существующего URL: %w", getErr)
+			}
+			return URLConflictError{ExistingShortURL: existingShortURL}
+		}
+
 		return fmt.Errorf("ошибка при сохранении URL: %w", err)
 	}
 

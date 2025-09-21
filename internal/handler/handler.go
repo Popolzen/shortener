@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"github.com/Popolzen/shortener/internal/config"
 	"github.com/Popolzen/shortener/internal/config/db"
 	"github.com/Popolzen/shortener/internal/model"
+	"github.com/Popolzen/shortener/internal/repository/database"
 	"github.com/Popolzen/shortener/internal/service/shortener"
 	"github.com/gin-gonic/gin"
 )
@@ -26,6 +28,15 @@ func PostHandler(urlService shortener.URLService, cfg *config.Config) gin.Handle
 		}
 
 		shortURL, err := urlService.Shorten(string(body))
+
+		var conflictErr database.URLConflictError
+		if errors.As(err, &conflictErr) {
+			fullShortURL := cfg.BaseURL + "/" + conflictErr.ExistingShortURL
+			c.Header("Content-Type", "text/plain")
+			c.Header("Content-Length", strconv.Itoa(len(fullShortURL)))
+			c.String(http.StatusConflict, fullShortURL)
+			return
+		}
 		if err != nil {
 			c.String(http.StatusBadRequest, "Не удалось сгенерить короткую ссылку")
 			return
@@ -66,6 +77,19 @@ func PostHandlerJSON(urlService shortener.URLService, cfg *config.Config) gin.Ha
 			return
 		}
 		shortURL, err := urlService.Shorten(request.URL)
+
+		// Проверяем, является ли ошибка конфликтом URL
+		var conflictErr database.URLConflictError
+		if errors.As(err, &conflictErr) {
+			fullShortURL := cfg.BaseURL + "/" + conflictErr.ExistingShortURL
+			response := model.Result{
+				Result: fullShortURL,
+			}
+			c.Header("Content-Type", "application/json")
+			c.JSON(http.StatusConflict, response)
+			return
+		}
+
 		if err != nil {
 			c.String(http.StatusBadRequest, "Не удалось сгенерить короткую ссылку")
 			return

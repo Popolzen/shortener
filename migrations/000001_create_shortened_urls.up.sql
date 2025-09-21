@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS shortened_urls (
     id BIGSERIAL PRIMARY KEY,
-    long_url TEXT NOT NULL,
+    long_url TEXT UNIQUE NOT NULL,
     short_url VARCHAR(20) UNIQUE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     
