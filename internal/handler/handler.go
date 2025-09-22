@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/Popolzen/shortener/internal/config"
-	"github.com/Popolzen/shortener/internal/config/db"
+	"github.com/Popolzen/shortener/internal/db"
 	"github.com/Popolzen/shortener/internal/model"
 	"github.com/Popolzen/shortener/internal/repository/database"
 	"github.com/Popolzen/shortener/internal/service/shortener"
@@ -29,9 +29,7 @@ func PostHandler(urlService shortener.URLService, cfg *config.Config) gin.Handle
 
 		shortURL, err := urlService.Shorten(string(body))
 
-		var conflictErr database.URLConflictError
-		if errors.As(err, &conflictErr) {
-			fullShortURL := cfg.BaseURL + "/" + conflictErr.ExistingShortURL
+		if fullShortURL, isConflict := handleConflictError(err, cfg.BaseURL); isConflict {
 			c.Header("Content-Type", "text/plain")
 			c.Header("Content-Length", strconv.Itoa(len(fullShortURL)))
 			c.String(http.StatusConflict, fullShortURL)
@@ -79,9 +77,7 @@ func PostHandlerJSON(urlService shortener.URLService, cfg *config.Config) gin.Ha
 		shortURL, err := urlService.Shorten(request.URL)
 
 		// Проверяем, является ли ошибка конфликтом URL
-		var conflictErr database.URLConflictError
-		if errors.As(err, &conflictErr) {
-			fullShortURL := cfg.BaseURL + "/" + conflictErr.ExistingShortURL
+		if fullShortURL, isConflict := handleConflictError(err, cfg.BaseURL); isConflict {
 			response := model.Result{
 				Result: fullShortURL,
 			}
@@ -160,4 +156,13 @@ func shortenBatch(req []model.URLBatchRequest, urlService shortener.URLService, 
 		response = append(response, model.URLBatchResponse{CorrelationID: request.CorrelationID, ShortURL: baseURL + "/" + shortURL})
 	}
 	return response, nil
+}
+
+// handleConflictError обрабатывает ошибку конфликта URL
+func handleConflictError(err error, baseURL string) (string, bool) {
+	var conflictErr *database.ErrURLConflictError
+	if errors.As(err, &conflictErr) {
+		return baseURL + "/" + conflictErr.ExistingShortURL, true
+	}
+	return "", false
 }

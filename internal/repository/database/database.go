@@ -10,20 +10,20 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-type URLConflictError struct {
+type ErrURLConflictError struct {
 	ExistingShortURL string
 }
 
-func (e URLConflictError) Error() string {
+func (e ErrURLConflictError) Error() string {
 	return fmt.Sprintf("URL уже существует с коротким URL: %s", e.ExistingShortURL)
 }
 
-type urlRepository struct {
+type URLRepository struct {
 	DB *sql.DB
 }
 
 // Get получает длинный URL по короткому
-func (r *urlRepository) Get(shortURL string) (string, error) {
+func (r *URLRepository) Get(shortURL string) (string, error) {
 	var longURL string
 	query := `SELECT long_url FROM shortened_urls WHERE short_url = $1`
 
@@ -39,7 +39,7 @@ func (r *urlRepository) Get(shortURL string) (string, error) {
 }
 
 // getByLongURL получает короткий URL по длинному
-func (r *urlRepository) getByLongURL(longURL string) (string, error) {
+func (r *URLRepository) getByLongURL(longURL string) (string, error) {
 	var shortURL string
 	query := `SELECT short_url FROM shortened_urls WHERE long_url = $1`
 	err := r.DB.QueryRow(query, longURL).Scan(&shortURL)
@@ -53,7 +53,7 @@ func (r *urlRepository) getByLongURL(longURL string) (string, error) {
 }
 
 // Store сохраняет соответствие короткого и длинного URL
-func (r *urlRepository) Store(shortURL, longURL string) error {
+func (r *URLRepository) Store(shortURL, longURL string) error {
 	query := `
     INSERT INTO shortened_urls (short_url, long_url, created_at)
     VALUES ($1, $2, $3)
@@ -70,7 +70,7 @@ func (r *urlRepository) Store(shortURL, longURL string) error {
 			if getErr != nil {
 				return fmt.Errorf("ошибка при получении существующего URL: %w", getErr)
 			}
-			return URLConflictError{ExistingShortURL: existingShortURL}
+			return ErrURLConflictError{ExistingShortURL: existingShortURL}
 		}
 
 		return fmt.Errorf("ошибка при сохранении URL: %w", err)
@@ -79,8 +79,8 @@ func (r *urlRepository) Store(shortURL, longURL string) error {
 	return nil
 }
 
-func NewURLRepository(db *sql.DB) *urlRepository {
-	return &urlRepository{
+func NewURLRepository(db *sql.DB) *URLRepository {
+	return &URLRepository{
 		DB: db,
 	}
 }
