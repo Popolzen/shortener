@@ -160,7 +160,7 @@ func shortenBatch(req []model.URLBatchRequest, urlService shortener.URLService, 
 
 // handleConflictError обрабатывает ошибку конфликта URL
 func handleConflictError(err error, baseURL string) (string, bool) {
-	var conflictErr *database.ErrURLConflictError
+	var conflictErr database.ErrURLConflictError
 	if errors.As(err, &conflictErr) {
 		return baseURL + "/" + conflictErr.ExistingShortURL, true
 	}
