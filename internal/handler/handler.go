@@ -28,7 +28,9 @@ func PostHandler(urlService shortener.URLService, cfg *config.Config) gin.Handle
 		}
 
 		userID, _ := c.Get("user_id")
+		fmt.Printf("[PostHandler] userID=%s, originalURL=%s\n", userID, string(body)) // Лог: userID и входной URL
 		shortURL, err := urlService.Shorten(string(body), userID.(string))
+		fmt.Printf("[PostHandler] shortURL=%s, err=%v\n", shortURL, err) // Лог: результат сокращения
 
 		if fullShortURL, isConflict := handleConflictError(err, cfg.BaseURL); isConflict {
 			c.Header("Content-Type", "text/plain")
