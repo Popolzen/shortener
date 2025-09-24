@@ -1,13 +1,17 @@
 package memory
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/Popolzen/shortener/internal/model"
+)
 
 type URLRepository struct {
 	urls         map[string]string
 	correlations map[string]string
 }
 
-func (r URLRepository) Get(shortURL, _ string) (string, error) {
+func (r URLRepository) Get(shortURL string) (string, error) {
 
 	if longURL, exists := r.urls[shortURL]; exists {
 		return longURL, nil
@@ -29,4 +33,9 @@ func NewURLRepository() *URLRepository {
 
 func (r *URLRepository) StoreBatch() {
 
+}
+
+// memory Repository - заглушки для GetUserURLs
+func (r *URLRepository) GetUserURLs(userID string) ([]model.URLPair, error) {
+	return nil, fmt.Errorf("GetUserURLs not implemented for in-memory storage")
 }

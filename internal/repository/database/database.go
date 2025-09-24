@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Popolzen/shortener/internal/model"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -23,7 +24,7 @@ type URLRepository struct {
 }
 
 // Get получает длинный URL по короткому
-func (r *URLRepository) Get(shortURL, id string) (string, error) {
+func (r *URLRepository) Get(shortURL string) (string, error) {
 	var longURL string
 	query := `SELECT long_url FROM shortened_urls WHERE short_url = $1 `
 
@@ -77,6 +78,35 @@ func (r *URLRepository) Store(shortURL, longURL, id string) error {
 	}
 
 	return nil
+}
+
+// GetUserURLs - возвращает все URLs для конкретного пользователя
+func (r *URLRepository) GetUserURLs(userID string) ([]model.URLPair, error) {
+	query := `SELECT short_url, long_url FROM shortened_urls WHERE user_id = $1 ORDER BY created_at DESC`
+	rows, err := r.DB.Query(query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка при получении URL пользователя: %w", err)
+	}
+	// defer rows.Close()
+
+	var urls []model.URLPair
+	for rows.Next() {
+		var pair model.URLPair
+		err := rows.Scan(&pair.ShortURL, &pair.OriginalURL)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return nil, fmt.Errorf("URL not found")
+			}
+			return nil, fmt.Errorf("ошибка при получении короткого URL: %w", err)
+		}
+		urls = append(urls, pair)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("ошибка при итерации по строкам: %w", err)
+	}
+
+	return urls, nil
 }
 
 func NewURLRepository(db *sql.DB) *URLRepository {

@@ -5,6 +5,7 @@ import (
 	"math/rand/v2"
 	"strings"
 
+	"github.com/Popolzen/shortener/internal/model"
 	"github.com/Popolzen/shortener/internal/repository"
 )
 
@@ -17,8 +18,8 @@ func NewURLService(repo repository.URLRepository) URLService {
 }
 
 // isUniq проверяет что ссылки уже нет
-func (s URLService) isUniq(shortURL string, id string) bool {
-	_, err := s.repo.Get(shortURL, id)
+func (s URLService) isUniq(shortURL string) bool {
+	_, err := s.repo.Get(shortURL)
 	return err != nil
 }
 
@@ -29,7 +30,7 @@ func (s URLService) Shorten(longURL string, id string) (string, error) {
 
 	for range maxAttempts {
 		su := shortURL(length)
-		if s.isUniq(su, id) {
+		if s.isUniq(su) {
 			err := s.repo.Store(su, longURL, id)
 			if err != nil {
 				return "", err
@@ -41,14 +42,15 @@ func (s URLService) Shorten(longURL string, id string) (string, error) {
 	return "", fmt.Errorf("не удалось создать уникальную ссылку за %d попыток", maxAttempts)
 }
 
-func (s URLService) GetLongURL(shortURL, id string) (string, error) {
-	value, err := s.repo.Get(shortURL, id)
+func (s URLService) GetLongURL(shortURL string) (string, error) {
+	value, err := s.repo.Get(shortURL)
 	return value, err
 }
 
-// func (s URLService) GetAllUserUrls(id string) ([]model.URLPair, error) {
-
-// }
+// GetUserURLs возвращает все URL конкретного пользователя
+func (s *URLService) GetUserURLs(userID string) ([]model.URLPair, error) {
+	return s.repo.GetUserURLs(userID)
+}
 
 // shortURL создает короткую версию URL
 func shortURL(length int) string {

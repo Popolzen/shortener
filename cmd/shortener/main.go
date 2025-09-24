@@ -85,6 +85,7 @@ func setupRouter(shortener shortener.URLService, cfg *config.Config) *gin.Engine
 	r.POST("/api/shorten", handler.PostHandlerJSON(shortener, cfg))
 	r.POST("/api/shorten/batch", handler.BatchHandler(shortener, cfg))
 	r.GET("/:id", handler.GetHandler(shortener))
+	r.GET("/api/user/urls", handler.GetUserURLsHandler(shortener))
 
 	dbCfg := db.NewDBConfig(*cfg)
 	r.GET("/ping", handler.PingHandler(dbCfg))

@@ -15,7 +15,7 @@ type urlRepository struct {
 	path string
 }
 
-func (r urlRepository) Get(shortURL, _ string) (string, error) {
+func (r urlRepository) Get(shortURL string) (string, error) {
 
 	if longURL, exists := r.urls[shortURL]; exists {
 		return longURL, nil
@@ -94,4 +94,9 @@ func (r *urlRepository) SaveURLToFile() error {
 	file.Write(data)
 
 	return nil
+}
+
+// FileStorage Repository - заглушки для GetUserURLs
+func (r *urlRepository) GetUserURLs(userID string) ([]model.URLPair, error) {
+	return nil, fmt.Errorf("GetUserURLs not implemented for file storage")
 }

@@ -53,9 +53,8 @@ func GetHandler(urlService shortener.URLService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		shortURL := strings.TrimPrefix(c.Request.URL.Path, "/")
-		userID, _ := c.Get("user_id")
 
-		longURL, err := urlService.GetLongURL(shortURL, userID.(string))
+		longURL, err := urlService.GetLongURL(shortURL)
 		if err != nil {
 			c.String(http.StatusNotFound, "Не нашли ссылку")
 			fmt.Print(err)
@@ -68,25 +67,49 @@ func GetHandler(urlService shortener.URLService) gin.HandlerFunc {
 	}
 }
 
-// // GetURlsHandler возвращает все ссылки пользователя
-// func GetURlsHandler(urlService shortener.URLService) gin.HandlerFunc {
-// 	return func(c *gin.Context) {
+// GetUserURLsHandler возвращает все URL пользователя
+func GetUserURLsHandler(urlService shortener.URLService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Проверяем валидность куки (для 401 статуса)
+		hadCookie, _ := c.Get("had_cookie")
+		cookieWasValid, _ := c.Get("cookie_was_valid")
 
-// 		shortURL := strings.TrimPrefix(c.Request.URL.Path, "/")
-// 		userID, _ := c.Get("user_id")
+		// Если была кука, но она невалидная - 401
+		if hadCookie.(bool) && !cookieWasValid.(bool) {
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
 
-// 		longURL, err := urlService.GetLongURL(shortURL, userID.(string))
+		// Получаем userID из контекста
+		userIDInterface, exists := c.Get("user_id")
+		if !exists {
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
 
-// 		if err != nil {
-// 			c.String(http.StatusNotFound, "Не нашли ссылку")
-// 			return
-// 		}
+		userID, ok := userIDInterface.(string)
+		if !ok {
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
 
-// 		c.Header("Location", longURL)
-// 		c.Header("Content-Type", "text/plain")
-// 		c.Status(http.StatusTemporaryRedirect)
-// 	}
-// }
+		// Получаем URL пользователя через сервис
+		urls, err := urlService.GetUserURLs(userID)
+		if err != nil {
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+
+		// Если URL нет - возвращаем 204 No Content
+		if len(urls) == 0 {
+			c.Status(http.StatusNoContent)
+			return
+		}
+
+		// Возвращаем список URL
+		c.JSON(http.StatusOK, urls)
+	}
+}
 
 // PostHandlerJSON создает короткую ссылку, принимает json, возвращает json.
 func PostHandlerJSON(urlService shortener.URLService, cfg *config.Config) gin.HandlerFunc {
