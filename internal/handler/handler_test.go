@@ -63,7 +63,8 @@ func TestGetHandler(t *testing.T) {
 
 			// Добавляем тестовые данные если нужно
 			if tt.setupData {
-				err := repo.Store(tt.shortURL, tt.longURL)
+				empty := ""
+				err := repo.Store(tt.shortURL, tt.longURL, empty)
 				require.NoError(t, err)
 			}
 
