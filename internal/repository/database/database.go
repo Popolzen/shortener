@@ -58,7 +58,6 @@ func (r *URLRepository) Store(shortURL, longURL, id string) error {
 	query := `
     INSERT INTO shortened_urls (short_url, long_url, created_at, user_id)
     VALUES ($1, $2, $3, $4)
-
 `
 
 	now := time.Now()

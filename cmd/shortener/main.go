@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/Popolzen/shortener/internal/config"
@@ -26,15 +27,15 @@ func main() {
 
 	gin.SetMode(gin.ReleaseMode)
 	cfg := config.NewConfig()
-
+	dbCfg := db.NewDBConfig(*cfg)
 	// Инициализируем репозиторий
-	repo := initRepository(cfg)
+	repo := initRepository(cfg, dbCfg)
 
 	// Создаем сервис
 	shortener := shortener.NewURLService(repo)
 
 	// Настраиваем роутер
-	r := setupRouter(shortener, cfg)
+	r := setupRouter(shortener, cfg, dbCfg)
 
 	// Запускаем сервер
 	addr := cfg.GetAddress()
@@ -45,12 +46,11 @@ func main() {
 }
 
 // initRepository инициализирует репозиторий в зависимости от конфигурации
-func initRepository(cfg *config.Config) repository.URLRepository {
+func initRepository(cfg *config.Config, dbCfg db.DBConfig) repository.URLRepository {
 	var repo repository.URLRepository
 
-	dbCfg := db.NewDBConfig(*cfg)
-	// dbCfg.DBurl = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-	// 	`localhost`, 5432, `postgres`, `123456`, `shortener`)
+	dbCfg.DBurl = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+		`localhost`, 5432, `postgres`, `123456`, `shortener`)
 
 	switch {
 	case dbCfg.DBurl != "":
@@ -75,7 +75,7 @@ func initRepository(cfg *config.Config) repository.URLRepository {
 }
 
 // setupRouter настраивает роуты и middleware
-func setupRouter(shortener shortener.URLService, cfg *config.Config) *gin.Engine {
+func setupRouter(shortener shortener.URLService, cfg *config.Config, dbCfg db.DBConfig) *gin.Engine {
 	r := gin.Default()
 	r.Use(logger.RequestLogger())
 	r.Use(compressor.Compresser())
@@ -86,8 +86,6 @@ func setupRouter(shortener shortener.URLService, cfg *config.Config) *gin.Engine
 	r.POST("/api/shorten/batch", handler.BatchHandler(shortener, cfg))
 	r.GET("/:id", handler.GetHandler(shortener))
 	r.GET("/api/user/urls", handler.GetUserURLsHandler(shortener))
-
-	dbCfg := db.NewDBConfig(*cfg)
 	r.GET("/ping", handler.PingHandler(dbCfg))
 
 	return r
