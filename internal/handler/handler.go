@@ -3,7 +3,6 @@ package handler
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -49,6 +48,24 @@ func PostHandler(urlService shortener.URLService, cfg *config.Config) gin.Handle
 
 // GetHandler перенаправляет по короткой ссылке
 func GetHandler(urlService shortener.URLService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		shortURL := strings.TrimPrefix(c.Request.URL.Path, "/")
+
+		longURL, err := urlService.GetLongURL(shortURL)
+		if err != nil {
+			c.String(http.StatusNotFound, "Не нашли ссылку")
+			return
+		}
+
+		c.Header("Location", longURL)
+		c.Header("Content-Type", "text/plain")
+		c.Status(http.StatusTemporaryRedirect)
+	}
+}
+
+// GetURlsHahdler возвращает все ссылки пользователя
+func GetURlsHahdler(urlService shortener.URLService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		shortURL := strings.TrimPrefix(c.Request.URL.Path, "/")
@@ -124,11 +141,6 @@ func BatchHandler(urlService shortener.URLService, cfg *config.Config) gin.Handl
 		if err := json.NewDecoder(c.Request.Body).Decode(&requestBatch); err != nil {
 			c.String(http.StatusBadRequest, "Неправильное тело запроса")
 			return
-		}
-
-		// Красивый вывод для дебага
-		if debugJSON, err := json.MarshalIndent(requestBatch, "", "  "); err == nil {
-			fmt.Printf("DEBUG RequestBatch:\n%s\n", string(debugJSON))
 		}
 
 		responseBatch, err := shortenBatch(requestBatch, urlService, cfg.GetBaseURL())

@@ -1,11 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/Popolzen/shortener/internal/config"
 	"github.com/Popolzen/shortener/internal/db"
 	"github.com/Popolzen/shortener/internal/handler"
+	"github.com/Popolzen/shortener/internal/middleware/auth"
 	"github.com/Popolzen/shortener/internal/middleware/compressor"
 	"github.com/Popolzen/shortener/internal/middleware/logger"
 	"github.com/Popolzen/shortener/internal/repository"
@@ -48,6 +50,8 @@ func initRepository(cfg *config.Config) repository.URLRepository {
 	var repo repository.URLRepository
 
 	dbCfg := db.NewDBConfig(*cfg)
+	dbCfg.DBurl = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+		`localhost`, 5432, `postgres`, `123456`, `shortener`)
 
 	switch {
 	case dbCfg.DBurl != "":
@@ -76,6 +80,7 @@ func setupRouter(shortener shortener.URLService, cfg *config.Config) *gin.Engine
 	r := gin.Default()
 	r.Use(logger.RequestLogger())
 	r.Use(compressor.Compresser())
+	r.Use(auth.AuthMiddleware())
 
 	r.POST("/", handler.PostHandler(shortener, cfg))
 	r.POST("/api/shorten", handler.PostHandlerJSON(shortener, cfg))
