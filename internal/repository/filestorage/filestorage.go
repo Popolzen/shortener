@@ -26,7 +26,7 @@ func (r urlRepository) Get(shortURL string) (string, error) {
 func (r *urlRepository) Store(shortURL, longURL string) error {
 
 	r.urls[shortURL] = longURL
-
+	r.SaveURLToFile()
 	return nil
 }
 

@@ -1,23 +1,22 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/Popolzen/shortener/internal/config"
+	"github.com/Popolzen/shortener/internal/db"
 	"github.com/Popolzen/shortener/internal/handler"
 	"github.com/Popolzen/shortener/internal/middleware/compressor"
 	"github.com/Popolzen/shortener/internal/middleware/logger"
+	"github.com/Popolzen/shortener/internal/repository"
+	"github.com/Popolzen/shortener/internal/repository/database"
 	"github.com/Popolzen/shortener/internal/repository/filestorage"
+	"github.com/Popolzen/shortener/internal/repository/memory"
 	"github.com/Popolzen/shortener/internal/service/shortener"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
-
 	// Инициализируем логгер
 	if err := logger.Init(); err != nil {
 		log.Fatal("Не удалось инициализировать логгер:", err)
@@ -25,39 +24,66 @@ func main() {
 	defer logger.Close()
 
 	gin.SetMode(gin.ReleaseMode)
-
 	cfg := config.NewConfig()
-	repo := filestorage.NewURLRepository(cfg.GetFilePath())
+
+	// Инициализируем репозиторий
+	repo := initRepository(cfg)
+
+	// Создаем сервис
 	shortener := shortener.NewURLService(repo)
 
-	r := gin.Default()
+	// Настраиваем роутер
+	r := setupRouter(shortener, cfg)
 
-	r.Use(logger.RequestLogger())
-	r.Use(compressor.Compresser())
-	r.POST("/", handler.PostHandler(shortener, cfg))
-	r.POST("/api/shorten", handler.PostHandlerJSON(shortener, cfg))
-	r.GET("/:id", handler.GetHandler(shortener))
-
-	// Обработка сигналов SIGINT и SIGTERM
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
-	go func() {
-		<-sigChan
-		fmt.Println("\nПолучен сигнал остановки, сохраняем данные...")
-		if err := repo.SaveURLToFile(); err != nil {
-			log.Printf("Ошибка сохранения при завершении: %v", err)
-			os.Exit(1)
-		}
-		fmt.Println("Данные сохранены, программа завершена.")
-		os.Exit(0)
-	}()
-
+	// Запускаем сервер
 	addr := cfg.GetAddress()
 	log.Printf("URL Shortener запущен на http://%s", addr)
-
 	if err := r.Run(addr); err != nil {
 		log.Fatal("Не удалось запустить сервер:", err)
 	}
+}
 
+// initRepository инициализирует репозиторий в зависимости от конфигурации
+func initRepository(cfg *config.Config) repository.URLRepository {
+	var repo repository.URLRepository
+
+	dbCfg := db.NewDBConfig(*cfg)
+
+	switch {
+	case dbCfg.DBurl != "":
+		dbInstance, err := db.NewDataBase(*cfg, dbCfg)
+		if err != nil {
+			log.Fatal("Ошибка подключения к БД:", err)
+		}
+		if err := dbInstance.Migrate(); err != nil {
+			log.Fatal("Ошибка выполнения миграций:", err)
+		}
+		repo = database.NewURLRepository(dbInstance.DB)
+		log.Println("Используется БД репозиторий")
+	case cfg.GetFilePath() != "":
+		repo = filestorage.NewURLRepository(cfg.GetFilePath())
+		log.Println("Используется файл")
+	default:
+		repo = memory.NewURLRepository()
+		log.Println("Используется память")
+	}
+
+	return repo
+}
+
+// setupRouter настраивает роуты и middleware
+func setupRouter(shortener shortener.URLService, cfg *config.Config) *gin.Engine {
+	r := gin.Default()
+	r.Use(logger.RequestLogger())
+	r.Use(compressor.Compresser())
+
+	r.POST("/", handler.PostHandler(shortener, cfg))
+	r.POST("/api/shorten", handler.PostHandlerJSON(shortener, cfg))
+	r.POST("/api/shorten/batch", handler.BatchHandler(shortener, cfg))
+	r.GET("/:id", handler.GetHandler(shortener))
+
+	dbCfg := db.NewDBConfig(*cfg)
+	r.GET("/ping", handler.PingHandler(dbCfg))
+
+	return r
 }

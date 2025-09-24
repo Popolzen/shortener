@@ -30,7 +30,10 @@ func (s URLService) Shorten(longURL string) (string, error) {
 	for range maxAttempts {
 		su := shortURL(length)
 		if s.isUniq(su) {
-			s.repo.Store(su, longURL)
+			err := s.repo.Store(su, longURL)
+			if err != nil {
+				return "", err
+			}
 			return su, nil
 		}
 	}

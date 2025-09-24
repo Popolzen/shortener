@@ -17,12 +17,14 @@ type Config struct {
 	ServerAddr string `env:"SERVER_ADDRESS"`
 	BaseURL    string `env:"BASE_URL"`
 	FilePath   string `env:"FILE_STORAGE_PATH"`
+	DBurl      string `env:"DATABASE_DSN"`
 }
 
 func (c *Config) getArgsFromCli() {
 	flag.StringVar(&c.ServerAddr, "a", DefaultServerAddr, "server host")
 	flag.StringVar(&c.BaseURL, "b", DefaultBaseURL, "base url for short links")
 	flag.StringVar(&c.FilePath, "f", DefaultFilePath, "file storage path")
+	flag.StringVar(&c.DBurl, "d", "", "DBurl")
 	flag.Parse()
 }
 
