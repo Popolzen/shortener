@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/Popolzen/shortener/internal/config"
@@ -49,8 +50,8 @@ func initRepository(cfg *config.Config) repository.URLRepository {
 	var repo repository.URLRepository
 
 	dbCfg := db.NewDBConfig(*cfg)
-	// dbCfg.DBurl = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-	// 	`localhost`, 5432, `postgres`, `123456`, `shortener`)
+	dbCfg.DBurl = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+		`localhost`, 5432, `postgres`, `123456`, `shortener`)
 
 	switch {
 	case dbCfg.DBurl != "":

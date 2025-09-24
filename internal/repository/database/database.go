@@ -25,7 +25,7 @@ type URLRepository struct {
 // Get получает длинный URL по короткому
 func (r *URLRepository) Get(shortURL, id string) (string, error) {
 	var longURL string
-	query := `SELECT long_url FROM shortened_urls WHERE short_url = $1 and user_id = $2`
+	query := `SELECT long_url FROM shortened_urls WHERE short_url = $1 `
 
 	err := r.DB.QueryRow(query, shortURL, id).Scan(&longURL)
 	if err != nil {
