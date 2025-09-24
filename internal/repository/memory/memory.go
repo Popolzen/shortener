@@ -2,12 +2,12 @@ package memory
 
 import "fmt"
 
-type urlRepository struct {
+type URLRepository struct {
 	urls         map[string]string
 	correlations map[string]string
 }
 
-func (r urlRepository) Get(shortURL, _ string) (string, error) {
+func (r URLRepository) Get(shortURL, _ string) (string, error) {
 
 	if longURL, exists := r.urls[shortURL]; exists {
 		return longURL, nil
@@ -15,18 +15,18 @@ func (r urlRepository) Get(shortURL, _ string) (string, error) {
 	return "", fmt.Errorf("URL not found")
 }
 
-func (r *urlRepository) Store(shortURL, longURL, _ string) error {
+func (r *URLRepository) Store(shortURL, longURL, _ string) error {
 	r.urls[shortURL] = longURL
 	return nil
 }
 
-func NewURLRepository() *urlRepository {
-	return &urlRepository{
+func NewURLRepository() *URLRepository {
+	return &URLRepository{
 		urls:         map[string]string{},
 		correlations: map[string]string{},
 	}
 }
 
-func (r *urlRepository) StoreBatch() {
+func (r *URLRepository) StoreBatch() {
 
 }
