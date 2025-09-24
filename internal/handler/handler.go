@@ -79,6 +79,7 @@ func GetUserURLsHandler(urlService shortener.URLService) gin.HandlerFunc {
 		// Если была кука, но она невалидная - 401
 		if hadCookie.(bool) && !cookieWasValid.(bool) {
 			c.AbortWithStatus(http.StatusUnauthorized)
+			fmt.Printf("[GetUserURLsHandler] NO Cookie")
 			return
 		}
 
@@ -86,10 +87,13 @@ func GetUserURLsHandler(urlService shortener.URLService) gin.HandlerFunc {
 		userIDInterface, exists := c.Get("user_id")
 		if !exists {
 			c.AbortWithStatus(http.StatusInternalServerError)
+
 			return
 		}
 
 		userID, ok := userIDInterface.(string)
+
+		fmt.Printf("[GetUserURLsHandler] userID=%s", userID)
 		if !ok {
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
