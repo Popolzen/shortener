@@ -46,6 +46,10 @@ func (s URLService) GetLongURL(shortURL, id string) (string, error) {
 	return value, err
 }
 
+// func (s URLService) GetAllUserUrls(id string) ([]model.URLPair, error) {
+
+// }
+
 // shortURL создает короткую версию URL
 func shortURL(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"

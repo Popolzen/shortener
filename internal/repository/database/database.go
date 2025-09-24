@@ -25,9 +25,9 @@ type URLRepository struct {
 // Get получает длинный URL по короткому
 func (r *URLRepository) Get(shortURL, id string) (string, error) {
 	var longURL string
-	query := `SELECT long_url FROM shortened_urls WHERE short_url = $1`
+	query := `SELECT long_url FROM shortened_urls WHERE short_url = $1 and user_id = $2`
 
-	err := r.DB.QueryRow(query, shortURL).Scan(&longURL)
+	err := r.DB.QueryRow(query, shortURL, id).Scan(&longURL)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return "", fmt.Errorf("URL not found")
@@ -55,13 +55,13 @@ func (r *URLRepository) getByLongURL(longURL string) (string, error) {
 // Store сохраняет соответствие короткого и длинного URL
 func (r *URLRepository) Store(shortURL, longURL, id string) error {
 	query := `
-    INSERT INTO shortened_urls (short_url, long_url, created_at)
-    VALUES ($1, $2, $3)
+    INSERT INTO shortened_urls (short_url, long_url, created_at, user_id)
+    VALUES ($1, $2, $3, $4)
 
 `
 
 	now := time.Now()
-	_, err := r.DB.Exec(query, shortURL, longURL, now)
+	_, err := r.DB.Exec(query, shortURL, longURL, now, id)
 	if err != nil {
 
 		var pgErr *pgconn.PgError

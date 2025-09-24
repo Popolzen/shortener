@@ -65,6 +65,26 @@ func GetHandler(urlService shortener.URLService) gin.HandlerFunc {
 	}
 }
 
+// GetURlsHandler возвращает все ссылки пользователя
+func GetURlsHandler(urlService shortener.URLService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		shortURL := strings.TrimPrefix(c.Request.URL.Path, "/")
+		userID, _ := c.Get("user_id")
+
+		longURL, err := urlService.GetLongURL(shortURL, userID.(string))
+
+		if err != nil {
+			c.String(http.StatusNotFound, "Не нашли ссылку")
+			return
+		}
+
+		c.Header("Location", longURL)
+		c.Header("Content-Type", "text/plain")
+		c.Status(http.StatusTemporaryRedirect)
+	}
+}
+
 // PostHandlerJSON создает короткую ссылку, принимает json, возвращает json.
 func PostHandlerJSON(urlService shortener.URLService, cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
