@@ -67,7 +67,7 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		signedValue := signUserID(userID)
 		fmt.Printf("[AuthMiddleware] Setting cookie: user_id=%s\n", signedValue)
-		c.SetCookie("user_id", signedValue, 3600*24*30, "/", "", true, true)
+		c.SetCookie("user_id", signedValue, 3600*24*30, "/", "", false, true)
 
 		c.Set("user_id", userID)
 		c.Set("cookie_was_valid", isValid)
