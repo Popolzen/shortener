@@ -28,9 +28,7 @@ func PostHandler(urlService shortener.URLService, cfg *config.Config) gin.Handle
 		}
 
 		userID, _ := c.Get("user_id")
-		fmt.Printf("[PostHandler] userID=%s, originalURL=%s\n", userID, string(body)) // Лог: userID и входной URL
 		shortURL, err := urlService.Shorten(string(body), userID.(string))
-		fmt.Printf("[PostHandler] shortURL=%s, err=%v\n", shortURL, err) // Лог: результат сокращения
 
 		if fullShortURL, isConflict := handleConflictError(err, cfg.BaseURL); isConflict {
 			c.Header("Content-Type", "text/plain")
@@ -70,7 +68,7 @@ func GetHandler(urlService shortener.URLService) gin.HandlerFunc {
 }
 
 // GetUserURLsHandler возвращает все URL пользователя
-func GetUserURLsHandler(urlService shortener.URLService) gin.HandlerFunc {
+func GetUserURLsHandler(urlService shortener.URLService, cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Проверяем валидность куки (для 401 статуса)
 		hadCookie, _ := c.Get("had_cookie")
@@ -79,7 +77,6 @@ func GetUserURLsHandler(urlService shortener.URLService) gin.HandlerFunc {
 		// Если была кука, но она невалидная - 401
 		if hadCookie.(bool) && !cookieWasValid.(bool) {
 			c.AbortWithStatus(http.StatusUnauthorized)
-			fmt.Printf("[GetUserURLsHandler] NO Cookie")
 			return
 		}
 
@@ -93,7 +90,6 @@ func GetUserURLsHandler(urlService shortener.URLService) gin.HandlerFunc {
 
 		userID, ok := userIDInterface.(string)
 
-		fmt.Printf("[GetUserURLsHandler] userID=%s", userID)
 		if !ok {
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
@@ -114,6 +110,10 @@ func GetUserURLsHandler(urlService shortener.URLService) gin.HandlerFunc {
 
 		// Возвращаем список URL
 		c.JSON(http.StatusOK, urls)
+		for i := range urls {
+			fullShortURL := cfg.BaseURL + "/" + urls[i].ShortURL
+			urls[i].ShortURL = fullShortURL
+		}
 	}
 }
 
