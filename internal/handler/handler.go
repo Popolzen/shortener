@@ -107,13 +107,14 @@ func GetUserURLsHandler(urlService shortener.URLService, cfg *config.Config) gin
 			c.Status(http.StatusNoContent)
 			return
 		}
-
-		// Возвращаем список URL
-		c.JSON(http.StatusOK, urls)
 		for i := range urls {
 			fullShortURL := cfg.BaseURL + "/" + urls[i].ShortURL
 			urls[i].ShortURL = fullShortURL
 		}
+
+		// Возвращаем список URL
+		c.JSON(http.StatusOK, urls)
+
 	}
 }
 
