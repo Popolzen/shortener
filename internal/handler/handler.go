@@ -26,7 +26,8 @@ func PostHandler(urlService shortener.URLService, cfg *config.Config) gin.Handle
 			return
 		}
 
-		shortURL, err := urlService.Shorten(string(body))
+		userID, _ := c.Get("user_id")
+		shortURL, err := urlService.Shorten(string(body), userID.(string))
 
 		if fullShortURL, isConflict := handleConflictError(err, cfg.BaseURL); isConflict {
 			c.Header("Content-Type", "text/plain")
@@ -51,8 +52,8 @@ func GetHandler(urlService shortener.URLService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		shortURL := strings.TrimPrefix(c.Request.URL.Path, "/")
-
-		longURL, err := urlService.GetLongURL(shortURL)
+		userID, _ := c.Get("user_id")
+		longURL, err := urlService.GetLongURL(shortURL, userID.(string))
 		if err != nil {
 			c.String(http.StatusNotFound, "Не нашли ссылку")
 			return
@@ -69,8 +70,8 @@ func GetURlsHahdler(urlService shortener.URLService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		shortURL := strings.TrimPrefix(c.Request.URL.Path, "/")
-
-		longURL, err := urlService.GetLongURL(shortURL)
+		userID, _ := c.Get("user_id")
+		longURL, err := urlService.GetLongURL(shortURL, userID.(string))
 		if err != nil {
 			c.String(http.StatusNotFound, "Не нашли ссылку")
 			return
@@ -91,7 +92,9 @@ func PostHandlerJSON(urlService shortener.URLService, cfg *config.Config) gin.Ha
 			c.String(http.StatusBadRequest, "Неправильное тело запроса")
 			return
 		}
-		shortURL, err := urlService.Shorten(request.URL)
+
+		userID, _ := c.Get("user_id")
+		shortURL, err := urlService.Shorten(request.URL, userID.(string))
 
 		// Проверяем, является ли ошибка конфликтом URL
 		if fullShortURL, isConflict := handleConflictError(err, cfg.BaseURL); isConflict {
@@ -143,7 +146,7 @@ func BatchHandler(urlService shortener.URLService, cfg *config.Config) gin.Handl
 			return
 		}
 
-		responseBatch, err := shortenBatch(requestBatch, urlService, cfg.GetBaseURL())
+		responseBatch, err := shortenBatch(requestBatch, urlService, cfg.GetBaseURL(), c)
 
 		if err != nil {
 			c.String(http.StatusBadRequest, "Не удалось сгенерить короткую ссылку")
@@ -158,10 +161,12 @@ func BatchHandler(urlService shortener.URLService, cfg *config.Config) gin.Handl
 }
 
 // shortenBatch сокращает батч ссылок
-func shortenBatch(req []model.URLBatchRequest, urlService shortener.URLService, baseURL string) ([]model.URLBatchResponse, error) {
+func shortenBatch(req []model.URLBatchRequest, urlService shortener.URLService, baseURL string, c *gin.Context) ([]model.URLBatchResponse, error) {
 	response := make([]model.URLBatchResponse, 0, len(req))
 	for _, request := range req {
-		shortURL, err := urlService.Shorten(request.OriginalURL)
+
+		userID, _ := c.Get("user_id")
+		shortURL, err := urlService.Shorten(request.OriginalURL, userID.(string))
 		if err != nil {
 			return nil, err
 		}

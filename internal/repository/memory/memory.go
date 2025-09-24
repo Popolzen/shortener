@@ -7,7 +7,7 @@ type urlRepository struct {
 	correlations map[string]string
 }
 
-func (r urlRepository) Get(shortURL string) (string, error) {
+func (r urlRepository) Get(shortURL, _ string) (string, error) {
 
 	if longURL, exists := r.urls[shortURL]; exists {
 		return longURL, nil
@@ -15,7 +15,7 @@ func (r urlRepository) Get(shortURL string) (string, error) {
 	return "", fmt.Errorf("URL not found")
 }
 
-func (r *urlRepository) Store(shortURL, longURL string) error {
+func (r *urlRepository) Store(shortURL, longURL, _ string) error {
 	r.urls[shortURL] = longURL
 	return nil
 }

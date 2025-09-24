@@ -17,20 +17,20 @@ func NewURLService(repo repository.URLRepository) URLService {
 }
 
 // isUniq проверяет что ссылки уже нет
-func (s URLService) isUniq(shortURL string) bool {
-	_, err := s.repo.Get(shortURL)
+func (s URLService) isUniq(shortURL string, id string) bool {
+	_, err := s.repo.Get(shortURL, id)
 	return err != nil
 }
 
 // Функция которая делает ссылку короткой и сохраняет ее в мапу
-func (s URLService) Shorten(longURL string) (string, error) {
+func (s URLService) Shorten(longURL string, id string) (string, error) {
 	const length = 6
 	const maxAttempts = 1000
 
 	for range maxAttempts {
 		su := shortURL(length)
-		if s.isUniq(su) {
-			err := s.repo.Store(su, longURL)
+		if s.isUniq(su, id) {
+			err := s.repo.Store(su, longURL, id)
 			if err != nil {
 				return "", err
 			}
@@ -41,8 +41,8 @@ func (s URLService) Shorten(longURL string) (string, error) {
 	return "", fmt.Errorf("не удалось создать уникальную ссылку за %d попыток", maxAttempts)
 }
 
-func (s URLService) GetLongURL(shortURL string) (string, error) {
-	value, err := s.repo.Get(shortURL)
+func (s URLService) GetLongURL(shortURL, id string) (string, error) {
+	value, err := s.repo.Get(shortURL, id)
 	return value, err
 }
 

@@ -23,7 +23,7 @@ type URLRepository struct {
 }
 
 // Get получает длинный URL по короткому
-func (r *URLRepository) Get(shortURL string) (string, error) {
+func (r *URLRepository) Get(shortURL, id string) (string, error) {
 	var longURL string
 	query := `SELECT long_url FROM shortened_urls WHERE short_url = $1`
 
@@ -53,7 +53,7 @@ func (r *URLRepository) getByLongURL(longURL string) (string, error) {
 }
 
 // Store сохраняет соответствие короткого и длинного URL
-func (r *URLRepository) Store(shortURL, longURL string) error {
+func (r *URLRepository) Store(shortURL, longURL, id string) error {
 	query := `
     INSERT INTO shortened_urls (short_url, long_url, created_at)
     VALUES ($1, $2, $3)
