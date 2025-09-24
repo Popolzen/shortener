@@ -422,7 +422,7 @@ func TestPingHandler(t *testing.T) {
 
 			router.ServeHTTP(w, req)
 			res := w.Result()
-
+			res.Body.Close()
 			assert.Equal(t, tt.wantStatus, res.StatusCode)
 		})
 	}
