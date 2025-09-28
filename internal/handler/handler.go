@@ -195,6 +195,21 @@ func BatchHandler(urlService shortener.URLService, cfg *config.Config) gin.Handl
 	}
 }
 
+func DeleteURLsHandler(c *gin.Context, urlService shortener.URLService) {
+	userID, _ := c.Get("user_id")
+
+	var urlIDs []string
+	if err := json.NewDecoder(c.Request.Body).Decode(&urlIDs); err != nil {
+		c.String(http.StatusBadRequest, "Неправильное тело запроса")
+		return
+	}
+
+	// Вызываем метод repository для асинхронного удаления
+	urlService.DeleteURLsAsync(userID.(string), urlIDs)
+
+	c.Status(http.StatusAccepted)
+}
+
 // shortenBatch сокращает батч ссылок
 func shortenBatch(req []model.URLBatchRequest, urlService shortener.URLService, baseURL string, c *gin.Context) ([]model.URLBatchResponse, error) {
 	response := make([]model.URLBatchResponse, 0, len(req))

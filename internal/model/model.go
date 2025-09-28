@@ -28,3 +28,9 @@ type URLPair struct {
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
 }
+
+// DeleteTask стурктура таски для удаления
+type DeleteTask struct {
+	UserID   string
+	ShortURL string
+}

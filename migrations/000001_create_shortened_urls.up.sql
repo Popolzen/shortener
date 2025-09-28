@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS shortened_urls (
     long_url TEXT UNIQUE NOT NULL,
     short_url VARCHAR(20) UNIQUE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    is_deleted BOOL DEFAULT FALSE,
     
     CONSTRAINT chk_long_url_length CHECK (length(long_url) <= 2048),
     CONSTRAINT chk_short_url_length CHECK (length(short_url) >= 4)

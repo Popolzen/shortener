@@ -52,6 +52,10 @@ func (s *URLService) GetUserURLs(userID string) ([]model.URLPair, error) {
 	return s.repo.GetUserURLs(userID)
 }
 
+func (s *URLService) DeleteURLsAsync(userID string, urlIDs []string) {
+
+}
+
 // shortURL создает короткую версию URL
 func shortURL(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
