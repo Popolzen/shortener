@@ -4,11 +4,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/Popolzen/shortener/internal/model"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/lib/pq"
 )
 
 type ErrURLConflictError struct {
@@ -20,7 +22,8 @@ func (e ErrURLConflictError) Error() string {
 }
 
 type URLRepository struct {
-	DB *sql.DB
+	DB            *sql.DB
+	DeleteChannel chan model.DeleteTask
 }
 
 // Get получает длинный URL по короткому
@@ -114,7 +117,86 @@ func NewURLRepository(db *sql.DB) *URLRepository {
 	}
 }
 
-// memory Repository - заглушки для DeteleUrls
+func (r *URLRepository) InitDeleteSystem() {
+	r.DeleteChannel = make(chan model.DeleteTask, 1000) // Буфер на 1000
+	// Запускаем несколько воркеров
+	for i := range 1 {
+		go r.deleteWorker()
+		log.Printf("Worker %d поднялся и готов к работе!", i)
+	}
+
+}
+
+func (r *URLRepository) deleteWorker() {
+	const batchSize = 100
+	const batchTimeout = 2 * time.Second
+
+	taskBuffer := make([]model.DeleteTask, 0, batchSize)
+	timer := time.NewTimer(batchTimeout)
+	defer timer.Stop()
+
+	for {
+		select {
+		case task, ok := <-r.DeleteChannel:
+			if !ok {
+				return
+			} // Если канал закрыт, выходим
+			taskBuffer = append(taskBuffer, task)
+			if len(taskBuffer) >= batchSize {
+				r.processBatch(taskBuffer)
+				taskBuffer = taskBuffer[:0]
+			}
+			timer.Reset(batchTimeout) // Reset после добавления
+
+		case <-timer.C: // Тикаем 2 секунды, и записываем неполный батч, если не набралось
+			if len(taskBuffer) > 0 {
+				r.processBatch(taskBuffer)
+				taskBuffer = taskBuffer[:0]
+			}
+			timer.Reset(batchTimeout) // Reset для следующего
+		}
+	}
+}
+func (r *URLRepository) processBatch(tasks []model.DeleteTask) {
+	if len(tasks) == 0 {
+		return
+	}
+	// Группируем по userID
+	groups := make(map[string][]string)
+	for _, task := range tasks {
+		groups[task.UserID] = append(groups[task.UserID], task.ShortURL)
+	}
+	// Для каждой группы
+	for userID, shortURLs := range groups {
+		err := r.batchDeleteURLs(userID, shortURLs)
+		if err != nil {
+			log.Printf("Ошибка в батче для user %s: %v", userID, err)
+		}
+	}
+}
+
+func (r *URLRepository) batchDeleteURLs(userID string, shortURLs []string) error {
+	if len(shortURLs) == 0 {
+		return nil
+	}
+
+	query := `
+        UPDATE shortened_urls 
+        SET is_deleted = true 
+        WHERE user_id = $1 AND short_url = ANY($2) AND is_deleted = false
+    `
+
+	_, err := r.DB.Exec(query, userID, pq.Array(shortURLs))
+	return err
+}
+
+// Асинхронное удаление - отправка в канал
 func (r *URLRepository) DeteleUrls(userID string, urlIDs []string) {
-	fmt.Print("DeteleUrls not implemented for in-memory storage")
+	for _, shortURL := range urlIDs {
+		select {
+		case r.DeleteChannel <- model.DeleteTask{UserID: userID, ShortURL: shortURL}:
+		default:
+			log.Printf("Delete channel full, task dropped: %s", shortURL)
+		}
+	}
 }

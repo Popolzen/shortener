@@ -195,19 +195,21 @@ func BatchHandler(urlService shortener.URLService, cfg *config.Config) gin.Handl
 	}
 }
 
-func DeleteURLsHandler(c *gin.Context, urlService shortener.URLService) {
-	userID, _ := c.Get("user_id")
+func DeleteURLsHandler(urlService shortener.URLService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, _ := c.Get("user_id")
 
-	var shortURLs []string
-	if err := json.NewDecoder(c.Request.Body).Decode(&shortURLs); err != nil {
-		c.String(http.StatusBadRequest, "Неправильное тело запроса")
-		return
+		var shortURLs []string
+		if err := json.NewDecoder(c.Request.Body).Decode(&shortURLs); err != nil {
+			c.String(http.StatusBadRequest, "Неправильное тело запроса")
+			return
+		}
+
+		// Вызываем метод repository для асинхронного удаления
+		urlService.DeleteURLsAsync(userID.(string), shortURLs)
+
+		c.Status(http.StatusAccepted)
 	}
-
-	// Вызываем метод repository для асинхронного удаления
-	urlService.DeleteURLsAsync(userID.(string), shortURLs)
-
-	c.Status(http.StatusAccepted)
 }
 
 // shortenBatch сокращает батч ссылок

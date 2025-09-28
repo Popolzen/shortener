@@ -85,7 +85,8 @@ func setupRouter(shortener shortener.URLService, cfg *config.Config, dbCfg db.DB
 	r.POST("/api/shorten/batch", handler.BatchHandler(shortener, cfg))
 	r.GET("/:id", handler.GetHandler(shortener))
 	r.GET("/api/user/urls", handler.GetUserURLsHandler(shortener, cfg))
-	r.GET("/ping", handler.PingHandler(dbCfg))
+	r.DELETE("/api/user/urls", handler.DeleteURLsHandler(shortener))
 
+	r.GET("/ping", handler.PingHandler(dbCfg))
 	return r
 }
