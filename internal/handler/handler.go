@@ -3,7 +3,6 @@ package handler
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -51,13 +50,14 @@ func PostHandler(urlService shortener.URLService, cfg *config.Config) gin.Handle
 // GetHandler перенаправляет по короткой ссылке
 func GetHandler(urlService shortener.URLService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-
 		shortURL := strings.TrimPrefix(c.Request.URL.Path, "/")
-
 		longURL, err := urlService.GetLongURL(shortURL)
 		if err != nil {
+			if errors.Is(err, model.ErrURLDeleted) { // ссылка deleted
+				c.Status(http.StatusGone) // 410
+				return
+			}
 			c.String(http.StatusNotFound, "Не нашли ссылку")
-			fmt.Print(err)
 			return
 		}
 

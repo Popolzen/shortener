@@ -26,17 +26,27 @@ type URLRepository struct {
 	DeleteChannel chan model.DeleteTask
 }
 
-// Get получает длинный URL по короткому
+// Get получает длинный URL по короткому с проверкой удаления
 func (r *URLRepository) Get(shortURL string) (string, error) {
 	var longURL string
-	query := `SELECT long_url FROM shortened_urls WHERE short_url = $1 `
+	var isDeleted bool
 
-	err := r.DB.QueryRow(query, shortURL).Scan(&longURL)
+	query := `
+        SELECT long_url, COALESCE(is_deleted, false) 
+        FROM shortened_urls 
+        WHERE short_url = $1
+    `
+
+	err := r.DB.QueryRow(query, shortURL).Scan(&longURL, &isDeleted)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return "", fmt.Errorf("URL not found")
 		}
 		return "", fmt.Errorf("ошибка при получении URL: %w", err)
+	}
+
+	if isDeleted {
+		return "", model.ErrURLDeleted
 	}
 
 	return longURL, nil
@@ -120,7 +130,7 @@ func NewURLRepository(db *sql.DB) *URLRepository {
 func (r *URLRepository) InitDeleteSystem() {
 	r.DeleteChannel = make(chan model.DeleteTask, 1000) // Буфер на 1000
 	// Запускаем несколько воркеров
-	for i := range 1 {
+	for i := range 3 {
 		go r.deleteWorker()
 		log.Printf("Worker %d поднялся и готов к работе!", i)
 	}
@@ -157,6 +167,7 @@ func (r *URLRepository) deleteWorker() {
 		}
 	}
 }
+
 func (r *URLRepository) processBatch(tasks []model.DeleteTask) {
 	if len(tasks) == 0 {
 		return
@@ -191,7 +202,7 @@ func (r *URLRepository) batchDeleteURLs(userID string, shortURLs []string) error
 }
 
 // Асинхронное удаление - отправка в канал
-func (r *URLRepository) DeteleUrls(userID string, urlIDs []string) {
+func (r *URLRepository) DeleteURLs(userID string, urlIDs []string) {
 	for _, shortURL := range urlIDs {
 		select {
 		case r.DeleteChannel <- model.DeleteTask{UserID: userID, ShortURL: shortURL}:

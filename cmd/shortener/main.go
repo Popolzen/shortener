@@ -61,6 +61,10 @@ func initRepository(cfg *config.Config, dbCfg db.DBConfig) repository.URLReposit
 			log.Fatal("Ошибка выполнения миграций:", err)
 		}
 		repo = database.NewURLRepository(dbInstance.DB)
+		if dbRepo, ok := repo.(*database.URLRepository); ok {
+			dbRepo.InitDeleteSystem()
+		}
+
 		log.Println("Используется БД репозиторий")
 	case cfg.GetFilePath() != "":
 		repo = filestorage.NewURLRepository(cfg.GetFilePath())

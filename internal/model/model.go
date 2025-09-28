@@ -1,5 +1,7 @@
 package model
 
+import "errors"
+
 type URL struct {
 	URL string `json:"url"`
 }
@@ -34,3 +36,6 @@ type DeleteTask struct {
 	UserID   string
 	ShortURL string
 }
+
+// Простая кастомная ошибка
+var ErrURLDeleted = errors.New("URL has been deleted")
