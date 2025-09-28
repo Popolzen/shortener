@@ -113,3 +113,8 @@ func NewURLRepository(db *sql.DB) *URLRepository {
 		DB: db,
 	}
 }
+
+// memory Repository - заглушки для DeteleUrls
+func (r *URLRepository) DeteleUrls(userID string, urlIDs []string) {
+	fmt.Print("DeteleUrls not implemented for in-memory storage")
+}

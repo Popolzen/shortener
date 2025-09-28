@@ -39,3 +39,8 @@ func (r *URLRepository) StoreBatch() {
 func (r *URLRepository) GetUserURLs(userID string) ([]model.URLPair, error) {
 	return nil, fmt.Errorf("GetUserURLs not implemented for in-memory storage")
 }
+
+// memory Repository - заглушки для GetUserURLs
+func (r *URLRepository) DeteleUrls(userID string, urlIDs []string) {
+	fmt.Print("DeteleUrls not implemented for in-memory storage")
+}

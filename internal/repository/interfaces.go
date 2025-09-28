@@ -6,4 +6,5 @@ type URLRepository interface {
 	Store(shortURL, longURL, userID string) error
 	Get(shortURL string) (string, error)
 	GetUserURLs(userID string) ([]model.URLPair, error)
+	DeteleUrls(userID string, urlIDs []string)
 }

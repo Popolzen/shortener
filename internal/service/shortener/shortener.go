@@ -52,8 +52,8 @@ func (s *URLService) GetUserURLs(userID string) ([]model.URLPair, error) {
 	return s.repo.GetUserURLs(userID)
 }
 
-func (s *URLService) DeleteURLsAsync(userID string, urlIDs []string) {
-
+func (s *URLService) DeleteURLsAsync(userID string, shortURLs []string) {
+	s.repo.DeteleUrls(userID, shortURLs)
 }
 
 // shortURL создает короткую версию URL
