@@ -6,21 +6,20 @@ import (
 	"encoding/base64"
 	"strings"
 
+	"github.com/Popolzen/shortener/internal/config"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-const secretKey = "guess_me"
-
 // validateCookie валидирует подписанную куки и возвращает userID, если валидна.
-func validateCookie(cookieValue string) (string, bool) {
+func validateCookie(cookieValue string, cfg *config.Config) (string, bool) {
 	parts := strings.Split(cookieValue, ".")
 	if len(parts) != 2 {
 		return "", false
 	}
 	userID, signature := parts[0], parts[1]
 
-	mac := hmac.New(sha256.New, []byte(secretKey))
+	mac := hmac.New(sha256.New, []byte(cfg.SecretKey))
 	mac.Write([]byte(userID))
 	expectedSignature := mac.Sum(nil)
 
@@ -35,15 +34,15 @@ func validateCookie(cookieValue string) (string, bool) {
 }
 
 // signUserID подписывает UserID с использованием HMAC-SHA256
-func signUserID(userID string) string {
-	mac := hmac.New(sha256.New, []byte(secretKey))
+func signUserID(userID string, cfg *config.Config) string {
+	mac := hmac.New(sha256.New, []byte(cfg.SecretKey))
 	mac.Write([]byte(userID))
 	signature := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 	return userID + "." + signature
 }
 
 // getOrCreateUserID извлекает userID из куки, если валидна, или генерирует новый.
-func getOrCreateUserID(c *gin.Context) (string, bool, bool) {
+func getOrCreateUserID(c *gin.Context, cfg *config.Config) (string, bool, bool) {
 	var userID string
 	var isValid bool
 	var hadCookie bool
@@ -55,7 +54,7 @@ func getOrCreateUserID(c *gin.Context) (string, bool, bool) {
 		userID = uuid.New().String()
 		isValid = false
 	} else {
-		userID, isValid = validateCookie(cookie)
+		userID, isValid = validateCookie(cookie, cfg)
 		if !isValid {
 			userID = uuid.New().String()
 		}
@@ -65,16 +64,16 @@ func getOrCreateUserID(c *gin.Context) (string, bool, bool) {
 }
 
 // setSignedCookie подписывает userID и устанавливает куки в ответе.
-func setSignedCookie(c *gin.Context, userID string) {
-	signedValue := signUserID(userID)
+func setSignedCookie(c *gin.Context, userID string, cfg *config.Config) {
+	signedValue := signUserID(userID, cfg)
 	c.SetCookie("user_id", signedValue, 3600*24*30, "/", "", false, true)
 }
 
 // AuthMiddleware - middleware для обработки аутентификации пользователя через куки.
-func AuthMiddleware() gin.HandlerFunc {
+func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userID, isValid, hadCookie := getOrCreateUserID(c)
-		setSignedCookie(c, userID)
+		userID, isValid, hadCookie := getOrCreateUserID(c, cfg)
+		setSignedCookie(c, userID, cfg)
 
 		c.Set("user_id", userID)
 		c.Set("cookie_was_valid", isValid)

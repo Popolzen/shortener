@@ -103,7 +103,7 @@ func setupRouter(shortener shortener.URLService, cfg *config.Config, dbCfg db.DB
 	r := gin.Default()
 	r.Use(logger.RequestLogger())
 	r.Use(compressor.Compresser())
-	r.Use(auth.AuthMiddleware())
+	r.Use(auth.AuthMiddleware(cfg))
 
 	r.POST("/", handler.PostHandler(shortener, cfg))
 	r.POST("/api/shorten", handler.PostHandlerJSON(shortener, cfg))
