@@ -536,7 +536,7 @@ func TestShortenBatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			response, err := shortenBatch(tt.request, urlService, "http://localhost:8080", c)
+			response, err := shortenBatch(tt.request, urlService, "http://localhost:8080", "test-user-123")
 
 			if tt.wantErr {
 				assert.Error(t, err)

@@ -16,6 +16,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// getUserID извлекает userID
+func getUserID(c *gin.Context) (string, bool) {
+	userIDInterface, exists := c.Get("user_id")
+	if !exists {
+		return "", false
+	}
+
+	userID, ok := userIDInterface.(string)
+	if !ok {
+		return "", false
+	}
+
+	return userID, true
+}
+
 // PostHandler создает короткую ссылку
 func PostHandler(urlService shortener.URLService, cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -26,8 +41,13 @@ func PostHandler(urlService shortener.URLService, cfg *config.Config) gin.Handle
 			return
 		}
 
-		userID, _ := c.Get("user_id")
-		shortURL, err := urlService.Shorten(string(body), userID.(string))
+		userID, ok := getUserID(c)
+		if !ok {
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+
+		shortURL, err := urlService.Shorten(string(body), userID)
 
 		if fullShortURL, isConflict := handleConflictError(err, cfg.BaseURL); isConflict {
 			c.Header("Content-Type", "text/plain")
@@ -81,22 +101,14 @@ func GetUserURLsHandler(urlService shortener.URLService, cfg *config.Config) gin
 		}
 
 		// Получаем userID из контекста
-		userIDInterface, exists := c.Get("user_id")
-		if !exists {
-			c.AbortWithStatus(http.StatusInternalServerError)
-
-			return
-		}
-
-		userID, ok := userIDInterface.(string)
-
+		userID, ok := getUserID(c)
 		if !ok {
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
 
-		// Получаем URL пользователя через сервис
-		urls, err := urlService.GetUserURLs(userID)
+		// Получаем отформатированные URL через сервис
+		urls, err := urlService.GetFormattedUserURLs(userID, cfg.BaseURL)
 		if err != nil {
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
@@ -107,14 +119,9 @@ func GetUserURLsHandler(urlService shortener.URLService, cfg *config.Config) gin
 			c.Status(http.StatusNoContent)
 			return
 		}
-		for i := range urls {
-			fullShortURL := cfg.BaseURL + "/" + urls[i].ShortURL
-			urls[i].ShortURL = fullShortURL
-		}
 
 		// Возвращаем список URL
 		c.JSON(http.StatusOK, urls)
-
 	}
 }
 
@@ -128,8 +135,13 @@ func PostHandlerJSON(urlService shortener.URLService, cfg *config.Config) gin.Ha
 			return
 		}
 
-		userID, _ := c.Get("user_id")
-		shortURL, err := urlService.Shorten(request.URL, userID.(string))
+		userID, ok := getUserID(c)
+		if !ok {
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+
+		shortURL, err := urlService.Shorten(request.URL, userID)
 
 		// Проверяем, является ли ошибка конфликтом URL
 		if fullShortURL, isConflict := handleConflictError(err, cfg.BaseURL); isConflict {
@@ -181,7 +193,13 @@ func BatchHandler(urlService shortener.URLService, cfg *config.Config) gin.Handl
 			return
 		}
 
-		responseBatch, err := shortenBatch(requestBatch, urlService, cfg.GetBaseURL(), c)
+		userID, ok := getUserID(c)
+		if !ok {
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+
+		responseBatch, err := shortenBatch(requestBatch, urlService, cfg.GetBaseURL(), userID)
 
 		if err != nil {
 			c.String(http.StatusBadRequest, "Не удалось сгенерить короткую ссылку")
@@ -197,7 +215,11 @@ func BatchHandler(urlService shortener.URLService, cfg *config.Config) gin.Handl
 
 func DeleteURLsHandler(urlService shortener.URLService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userID, _ := c.Get("user_id")
+		userID, ok := getUserID(c)
+		if !ok {
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
 
 		var shortURLs []string
 		if err := json.NewDecoder(c.Request.Body).Decode(&shortURLs); err != nil {
@@ -206,19 +228,17 @@ func DeleteURLsHandler(urlService shortener.URLService) gin.HandlerFunc {
 		}
 
 		// Вызываем метод repository для асинхронного удаления
-		urlService.DeleteURLsAsync(userID.(string), shortURLs)
+		urlService.DeleteURLsAsync(userID, shortURLs)
 
 		c.Status(http.StatusAccepted)
 	}
 }
 
 // shortenBatch сокращает батч ссылок
-func shortenBatch(req []model.URLBatchRequest, urlService shortener.URLService, baseURL string, c *gin.Context) ([]model.URLBatchResponse, error) {
+func shortenBatch(req []model.URLBatchRequest, urlService shortener.URLService, baseURL string, userID string) ([]model.URLBatchResponse, error) {
 	response := make([]model.URLBatchResponse, 0, len(req))
 	for _, request := range req {
-
-		userID, _ := c.Get("user_id")
-		shortURL, err := urlService.Shorten(request.OriginalURL, userID.(string))
+		shortURL, err := urlService.Shorten(request.OriginalURL, userID)
 		if err != nil {
 			return nil, err
 		}

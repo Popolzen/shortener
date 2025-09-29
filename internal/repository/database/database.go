@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/Popolzen/shortener/internal/model"
@@ -24,6 +25,7 @@ func (e ErrURLConflictError) Error() string {
 type URLRepository struct {
 	DB            *sql.DB
 	DeleteChannel chan model.DeleteTask
+	WG            sync.WaitGroup
 }
 
 // Get получает длинный URL по короткому с проверкой удаления
@@ -122,17 +124,23 @@ func (r *URLRepository) GetUserURLs(userID string) ([]model.URLPair, error) {
 }
 
 func NewURLRepository(db *sql.DB) *URLRepository {
-	return &URLRepository{
+	repo := &URLRepository{
 		DB: db,
 	}
+	repo.initDeleteSystem()
+	return repo
 }
 
-func (r *URLRepository) InitDeleteSystem() {
+func (r *URLRepository) initDeleteSystem() {
 	r.DeleteChannel = make(chan model.DeleteTask, 1000) // Буфер на 1000
 	// Запускаем несколько воркеров
 	for i := range 3 {
-		go r.deleteWorker()
-		log.Printf("Worker %d поднялся и готов к работе!", i)
+		r.WG.Add(1)
+		go func(id int) {
+			defer r.WG.Done()
+			log.Printf("Worker %d поднялся и готов к работе!", id)
+			r.deleteWorker()
+		}(i)
 	}
 
 }
@@ -210,4 +218,9 @@ func (r *URLRepository) DeleteURLs(userID string, urlIDs []string) {
 			log.Printf("Delete channel full, task dropped: %s", shortURL)
 		}
 	}
+}
+
+func (r *URLRepository) Shutdown() {
+	close(r.DeleteChannel)
+	r.WG.Wait()
 }

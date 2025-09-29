@@ -42,6 +42,18 @@ func (s URLService) Shorten(longURL string, id string) (string, error) {
 	return "", fmt.Errorf("не удалось создать уникальную ссылку за %d попыток", maxAttempts)
 }
 
+func (s URLService) GetFormattedUserURLs(userID string, baseURL string) ([]model.URLPair, error) {
+	urls, err := s.GetUserURLs(userID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range urls {
+		fullShortURL := baseURL + "/" + urls[i].ShortURL
+		urls[i].ShortURL = fullShortURL
+	}
+	return urls, nil
+}
+
 func (s URLService) GetLongURL(shortURL string) (string, error) {
 	value, err := s.repo.Get(shortURL)
 	return value, err

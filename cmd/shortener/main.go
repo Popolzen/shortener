@@ -2,6 +2,9 @@ package main
 
 import (
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/Popolzen/shortener/internal/config"
 	"github.com/Popolzen/shortener/internal/db"
@@ -42,6 +45,9 @@ func main() {
 	if err := r.Run(addr); err != nil {
 		log.Fatal("Не удалось запустить сервер:", err)
 	}
+
+	// Graceful Shutdown
+	setupGracefulShutdown(repo)
 }
 
 // initRepository инициализирует репозиторий в зависимости от конфигурации
@@ -61,9 +67,6 @@ func initRepository(cfg *config.Config, dbCfg db.DBConfig) repository.URLReposit
 			log.Fatal("Ошибка выполнения миграций:", err)
 		}
 		repo = database.NewURLRepository(dbInstance.DB)
-		if dbRepo, ok := repo.(*database.URLRepository); ok {
-			dbRepo.InitDeleteSystem()
-		}
 
 		log.Println("Используется БД репозиторий")
 	case cfg.GetFilePath() != "":
@@ -75,6 +78,24 @@ func initRepository(cfg *config.Config, dbCfg db.DBConfig) repository.URLReposit
 	}
 
 	return repo
+}
+
+// GracefulShutdown
+func setupGracefulShutdown(repo repository.URLRepository) {
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-quit
+		log.Println("Получен сигнал остановки, завершаем работу...")
+		if dbRepo, ok := repo.(*database.URLRepository); ok {
+			dbRepo.Shutdown() // Закрываем канал и ждём worker'ов
+			if err := dbRepo.DB.Close(); err != nil {
+				log.Printf("Ошибка закрытия DB: %v", err)
+			}
+		}
+		log.Println("Сервис остановлен gracefully")
+		os.Exit(0)
+	}()
 }
 
 // setupRouter настраивает роуты и middleware

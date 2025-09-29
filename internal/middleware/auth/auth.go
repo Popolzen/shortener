@@ -4,7 +4,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
-	"fmt"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -13,6 +12,7 @@ import (
 
 const secretKey = "guess_me"
 
+// validateCookie валидирует подписанную куки и возвращает userID, если валидна.
 func validateCookie(cookieValue string) (string, bool) {
 	parts := strings.Split(cookieValue, ".")
 	if len(parts) != 2 {
@@ -42,33 +42,43 @@ func signUserID(userID string) string {
 	return userID + "." + signature
 }
 
+// getOrCreateUserID извлекает userID из куки, если валидна, или генерирует новый.
+func getOrCreateUserID(c *gin.Context) (string, bool, bool) {
+	var userID string
+	var isValid bool
+	var hadCookie bool
+
+	cookie, err := c.Cookie("user_id")
+	hadCookie = (err == nil && cookie != "")
+
+	if !hadCookie {
+		userID = uuid.New().String()
+		isValid = false
+	} else {
+		userID, isValid = validateCookie(cookie)
+		if !isValid {
+			userID = uuid.New().String()
+		}
+	}
+
+	return userID, isValid, hadCookie
+}
+
+// setSignedCookie подписывает userID и устанавливает куки в ответе.
+func setSignedCookie(c *gin.Context, userID string) {
+	signedValue := signUserID(userID)
+	c.SetCookie("user_id", signedValue, 3600*24*30, "/", "", false, true)
+}
+
+// AuthMiddleware - middleware для обработки аутентификации пользователя через куки.
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var userID string
-		var isValid bool
-		var hadCookie bool
-
-		cookie, err := c.Cookie("user_id")
-		hadCookie = (err == nil && cookie != "")
-
-		if !hadCookie {
-			userID = uuid.New().String()
-			isValid = false
-		} else {
-			userID, isValid = validateCookie(cookie)
-			if !isValid {
-				userID = uuid.New().String()
-			}
-		}
-
-		signedValue := signUserID(userID)
-		fmt.Printf("[AuthMiddleware] Setting cookie: user_id=%s\n", signedValue)
-		c.SetCookie("user_id", signedValue, 3600*24*30, "/", "", false, true)
+		userID, isValid, hadCookie := getOrCreateUserID(c)
+		setSignedCookie(c, userID)
 
 		c.Set("user_id", userID)
 		c.Set("cookie_was_valid", isValid)
 		c.Set("had_cookie", hadCookie)
-		fmt.Printf("[AuthMiddleware] Context set: user_id=%s, cookie_was_valid=%v, had_cookie=%v\n", userID, isValid, hadCookie)
 
 		c.Next()
 	}
