@@ -10,12 +10,12 @@ import (
 	"github.com/google/uuid"
 )
 
-type urlRepository struct {
+type URLRepository struct {
 	urls map[string]string
 	path string
 }
 
-func (r urlRepository) Get(shortURL string) (string, error) {
+func (r URLRepository) Get(shortURL string) (string, error) {
 
 	if longURL, exists := r.urls[shortURL]; exists {
 		return longURL, nil
@@ -23,15 +23,15 @@ func (r urlRepository) Get(shortURL string) (string, error) {
 	return "", fmt.Errorf("URL not found")
 }
 
-func (r *urlRepository) Store(shortURL, longURL string) error {
+func (r *URLRepository) Store(shortURL, longURL, _ string) error {
 
 	r.urls[shortURL] = longURL
 	r.SaveURLToFile()
 	return nil
 }
 
-func NewURLRepository(path string) *urlRepository {
-	var repo urlRepository
+func NewURLRepository(path string) *URLRepository {
+	var repo URLRepository
 
 	repo.path = path
 	repo.urls = map[string]string{}
@@ -39,7 +39,7 @@ func NewURLRepository(path string) *urlRepository {
 	err := repo.loadURLs(path)
 
 	if err != nil {
-		return &urlRepository{
+		return &URLRepository{
 			urls: map[string]string{},
 			path: path,
 		}
@@ -48,7 +48,7 @@ func NewURLRepository(path string) *urlRepository {
 }
 
 // loadURLs - загружает данные из файла в память.
-func (r *urlRepository) loadURLs(path string) error {
+func (r *URLRepository) loadURLs(path string) error {
 	var urlRecord []model.URLRecord
 
 	file, err := os.OpenFile(path, os.O_RDONLY, 0644)
@@ -73,7 +73,7 @@ func (r *urlRepository) loadURLs(path string) error {
 }
 
 // SaveURLToFile  запись по url в файл
-func (r *urlRepository) SaveURLToFile() error {
+func (r *URLRepository) SaveURLToFile() error {
 	urls := make([]model.URLRecord, 0, len(r.urls))
 
 	for key, value := range r.urls {
@@ -94,4 +94,14 @@ func (r *urlRepository) SaveURLToFile() error {
 	file.Write(data)
 
 	return nil
+}
+
+// FileStorage Repository - заглушки для GetUserURLs
+func (r *URLRepository) GetUserURLs(userID string) ([]model.URLPair, error) {
+	return nil, fmt.Errorf("GetUserURLs not implemented for file storage")
+}
+
+// memory Repository - заглушки для DeleteURLs
+func (r *URLRepository) DeleteURLs(userID string, urlIDs []string) {
+	fmt.Print("DeteleUrls not implemented for in-memory storage")
 }

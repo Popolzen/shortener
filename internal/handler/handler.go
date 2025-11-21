@@ -3,7 +3,6 @@ package handler
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -17,6 +16,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// getUserID извлекает userID
+func getUserID(c *gin.Context) (string, bool) {
+	userIDInterface, exists := c.Get("user_id")
+	if !exists {
+		return "", false
+	}
+
+	userID, ok := userIDInterface.(string)
+	if !ok {
+		return "", false
+	}
+
+	return userID, true
+}
+
 // PostHandler создает короткую ссылку
 func PostHandler(urlService shortener.URLService, cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -27,7 +41,13 @@ func PostHandler(urlService shortener.URLService, cfg *config.Config) gin.Handle
 			return
 		}
 
-		shortURL, err := urlService.Shorten(string(body))
+		userID, ok := getUserID(c)
+		if !ok {
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+
+		shortURL, err := urlService.Shorten(string(body), userID)
 
 		if fullShortURL, isConflict := handleConflictError(err, cfg.BaseURL); isConflict {
 			c.Header("Content-Type", "text/plain")
@@ -50,11 +70,13 @@ func PostHandler(urlService shortener.URLService, cfg *config.Config) gin.Handle
 // GetHandler перенаправляет по короткой ссылке
 func GetHandler(urlService shortener.URLService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-
 		shortURL := strings.TrimPrefix(c.Request.URL.Path, "/")
-
 		longURL, err := urlService.GetLongURL(shortURL)
 		if err != nil {
+			if errors.Is(err, model.ErrURLDeleted) { // ссылка deleted
+				c.Status(http.StatusGone) // 410
+				return
+			}
 			c.String(http.StatusNotFound, "Не нашли ссылку")
 			return
 		}
@@ -62,6 +84,44 @@ func GetHandler(urlService shortener.URLService) gin.HandlerFunc {
 		c.Header("Location", longURL)
 		c.Header("Content-Type", "text/plain")
 		c.Status(http.StatusTemporaryRedirect)
+	}
+}
+
+// GetUserURLsHandler возвращает все URL пользователя
+func GetUserURLsHandler(urlService shortener.URLService, cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Проверяем валидность куки (для 401 статуса)
+		hadCookie, _ := c.Get("had_cookie")
+		cookieWasValid, _ := c.Get("cookie_was_valid")
+
+		// Если была кука, но она невалидная - 401
+		if hadCookie.(bool) && !cookieWasValid.(bool) {
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+
+		// Получаем userID из контекста
+		userID, ok := getUserID(c)
+		if !ok {
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+
+		// Получаем отформатированные URL через сервис
+		urls, err := urlService.GetFormattedUserURLs(userID, cfg.BaseURL)
+		if err != nil {
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+
+		// Если URL нет - возвращаем 204 No Content
+		if len(urls) == 0 {
+			c.Status(http.StatusNoContent)
+			return
+		}
+
+		// Возвращаем список URL
+		c.JSON(http.StatusOK, urls)
 	}
 }
 
@@ -74,7 +134,14 @@ func PostHandlerJSON(urlService shortener.URLService, cfg *config.Config) gin.Ha
 			c.String(http.StatusBadRequest, "Неправильное тело запроса")
 			return
 		}
-		shortURL, err := urlService.Shorten(request.URL)
+
+		userID, ok := getUserID(c)
+		if !ok {
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+
+		shortURL, err := urlService.Shorten(request.URL, userID)
 
 		// Проверяем, является ли ошибка конфликтом URL
 		if fullShortURL, isConflict := handleConflictError(err, cfg.BaseURL); isConflict {
@@ -126,12 +193,13 @@ func BatchHandler(urlService shortener.URLService, cfg *config.Config) gin.Handl
 			return
 		}
 
-		// Красивый вывод для дебага
-		if debugJSON, err := json.MarshalIndent(requestBatch, "", "  "); err == nil {
-			fmt.Printf("DEBUG RequestBatch:\n%s\n", string(debugJSON))
+		userID, ok := getUserID(c)
+		if !ok {
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
 		}
 
-		responseBatch, err := shortenBatch(requestBatch, urlService, cfg.GetBaseURL())
+		responseBatch, err := shortenBatch(requestBatch, urlService, cfg.GetBaseURL(), userID)
 
 		if err != nil {
 			c.String(http.StatusBadRequest, "Не удалось сгенерить короткую ссылку")
@@ -145,11 +213,32 @@ func BatchHandler(urlService shortener.URLService, cfg *config.Config) gin.Handl
 	}
 }
 
+func DeleteURLsHandler(urlService shortener.URLService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, ok := getUserID(c)
+		if !ok {
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+
+		var shortURLs []string
+		if err := json.NewDecoder(c.Request.Body).Decode(&shortURLs); err != nil {
+			c.String(http.StatusBadRequest, "Неправильное тело запроса")
+			return
+		}
+
+		// Вызываем метод repository для асинхронного удаления
+		urlService.DeleteURLsAsync(userID, shortURLs)
+
+		c.Status(http.StatusAccepted)
+	}
+}
+
 // shortenBatch сокращает батч ссылок
-func shortenBatch(req []model.URLBatchRequest, urlService shortener.URLService, baseURL string) ([]model.URLBatchResponse, error) {
+func shortenBatch(req []model.URLBatchRequest, urlService shortener.URLService, baseURL string, userID string) ([]model.URLBatchResponse, error) {
 	response := make([]model.URLBatchResponse, 0, len(req))
 	for _, request := range req {
-		shortURL, err := urlService.Shorten(request.OriginalURL)
+		shortURL, err := urlService.Shorten(request.OriginalURL, userID)
 		if err != nil {
 			return nil, err
 		}

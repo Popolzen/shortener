@@ -18,6 +18,7 @@ type Config struct {
 	BaseURL    string `env:"BASE_URL"`
 	FilePath   string `env:"FILE_STORAGE_PATH"`
 	DBurl      string `env:"DATABASE_DSN"`
+	SecretKey  string `env:"KEY"`
 }
 
 func (c *Config) getArgsFromCli() {
@@ -25,6 +26,7 @@ func (c *Config) getArgsFromCli() {
 	flag.StringVar(&c.BaseURL, "b", DefaultBaseURL, "base url for short links")
 	flag.StringVar(&c.FilePath, "f", DefaultFilePath, "file storage path")
 	flag.StringVar(&c.DBurl, "d", "", "DBurl")
+	flag.StringVar(&c.SecretKey, "k", "", "secret key")
 	flag.Parse()
 }
 
