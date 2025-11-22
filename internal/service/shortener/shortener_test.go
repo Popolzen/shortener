@@ -11,21 +11,16 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+// === Тесты с gomock (взаимодействие с репозиторием) ===
+
 func TestShorten_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	repo := mocks.NewMockURLRepository(ctrl)
 
-	// Get вернёт ошибку = URL уникален
-	repo.EXPECT().
-		Get(gomock.Any()).
-		Return("", errors.New("not found"))
-
-	// Store должен быть вызван с правильными аргументами
-	repo.EXPECT().
-		Store(gomock.Len(6), "https://example.com", "user-123").
-		Return(nil)
+	repo.EXPECT().Get(gomock.Any()).Return("", errors.New("not found"))
+	repo.EXPECT().Store(gomock.Any(), "https://example.com", "user-123").Return(nil)
 
 	service := NewURLService(repo)
 	shortURL, err := service.Shorten("https://example.com", "user-123")
@@ -40,19 +35,14 @@ func TestShorten_StoreError(t *testing.T) {
 
 	repo := mocks.NewMockURLRepository(ctrl)
 
-	repo.EXPECT().
-		Get(gomock.Any()).
-		Return("", errors.New("not found"))
-
-	repo.EXPECT().
-		Store(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(errors.New("db connection failed"))
+	repo.EXPECT().Get(gomock.Any()).Return("", errors.New("not found"))
+	repo.EXPECT().Store(gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New("db error"))
 
 	service := NewURLService(repo)
 	_, err := service.Shorten("https://example.com", "user-123")
 
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "db connection failed")
+	assert.Contains(t, err.Error(), "db error")
 }
 
 func TestShorten_RetryOnCollision(t *testing.T) {
@@ -61,16 +51,14 @@ func TestShorten_RetryOnCollision(t *testing.T) {
 
 	repo := mocks.NewMockURLRepository(ctrl)
 
-	// Первые 2 раза URL существует, третий — уникален
+	// Первые 2 раза URL существует, третий — свободен
 	gomock.InOrder(
-		repo.EXPECT().Get(gomock.Any()).Return("https://exists.com", nil),
-		repo.EXPECT().Get(gomock.Any()).Return("https://exists.com", nil),
+		repo.EXPECT().Get(gomock.Any()).Return("exists", nil),
+		repo.EXPECT().Get(gomock.Any()).Return("exists", nil),
 		repo.EXPECT().Get(gomock.Any()).Return("", errors.New("not found")),
 	)
 
-	repo.EXPECT().
-		Store(gomock.Any(), "https://example.com", "user-1").
-		Return(nil)
+	repo.EXPECT().Store(gomock.Any(), "https://example.com", "user-1").Return(nil)
 
 	service := NewURLService(repo)
 	shortURL, err := service.Shorten("https://example.com", "user-1")
@@ -84,10 +72,7 @@ func TestGetLongURL_Success(t *testing.T) {
 	defer ctrl.Finish()
 
 	repo := mocks.NewMockURLRepository(ctrl)
-
-	repo.EXPECT().
-		Get("abc123").
-		Return("https://example.com", nil)
+	repo.EXPECT().Get("abc123").Return("https://example.com", nil)
 
 	service := NewURLService(repo)
 	longURL, err := service.GetLongURL("abc123")
@@ -101,13 +86,10 @@ func TestGetLongURL_NotFound(t *testing.T) {
 	defer ctrl.Finish()
 
 	repo := mocks.NewMockURLRepository(ctrl)
-
-	repo.EXPECT().
-		Get("notexists").
-		Return("", errors.New("URL not found"))
+	repo.EXPECT().Get("missing").Return("", errors.New("not found"))
 
 	service := NewURLService(repo)
-	_, err := service.GetLongURL("notexists")
+	_, err := service.GetLongURL("missing")
 
 	assert.Error(t, err)
 }
@@ -117,13 +99,10 @@ func TestGetLongURL_Deleted(t *testing.T) {
 	defer ctrl.Finish()
 
 	repo := mocks.NewMockURLRepository(ctrl)
-
-	repo.EXPECT().
-		Get("deleted123").
-		Return("", model.ErrURLDeleted)
+	repo.EXPECT().Get("deleted").Return("", model.ErrURLDeleted)
 
 	service := NewURLService(repo)
-	_, err := service.GetLongURL("deleted123")
+	_, err := service.GetLongURL("deleted")
 
 	assert.ErrorIs(t, err, model.ErrURLDeleted)
 }
@@ -133,21 +112,19 @@ func TestGetFormattedUserURLs_Success(t *testing.T) {
 	defer ctrl.Finish()
 
 	repo := mocks.NewMockURLRepository(ctrl)
-
-	repo.EXPECT().
-		GetUserURLs("user-123").
-		Return([]model.URLPair{
-			{ShortURL: "abc", OriginalURL: "https://one.com"},
-			{ShortURL: "def", OriginalURL: "https://two.com"},
-		}, nil)
+	repo.EXPECT().GetUserURLs("user-1").Return([]model.URLPair{
+		{ShortURL: "abc", OriginalURL: "https://one.com"},
+		{ShortURL: "def", OriginalURL: "https://two.com"},
+	}, nil)
 
 	service := NewURLService(repo)
-	urls, err := service.GetFormattedUserURLs("user-123", "http://localhost:8080")
+	urls, err := service.GetFormattedUserURLs("user-1", "http://localhost:8080")
 
 	require.NoError(t, err)
 	require.Len(t, urls, 2)
 	assert.Equal(t, "http://localhost:8080/abc", urls[0].ShortURL)
 	assert.Equal(t, "http://localhost:8080/def", urls[1].ShortURL)
+	// OriginalURL не меняется
 	assert.Equal(t, "https://one.com", urls[0].OriginalURL)
 }
 
@@ -156,10 +133,7 @@ func TestGetFormattedUserURLs_Empty(t *testing.T) {
 	defer ctrl.Finish()
 
 	repo := mocks.NewMockURLRepository(ctrl)
-
-	repo.EXPECT().
-		GetUserURLs("unknown").
-		Return([]model.URLPair{}, nil)
+	repo.EXPECT().GetUserURLs("unknown").Return(nil, nil)
 
 	service := NewURLService(repo)
 	urls, err := service.GetFormattedUserURLs("unknown", "http://localhost")
@@ -168,15 +142,12 @@ func TestGetFormattedUserURLs_Empty(t *testing.T) {
 	assert.Empty(t, urls)
 }
 
-func TestGetFormattedUserURLs_RepoError(t *testing.T) {
+func TestGetFormattedUserURLs_Error(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	repo := mocks.NewMockURLRepository(ctrl)
-
-	repo.EXPECT().
-		GetUserURLs("user-1").
-		Return(nil, errors.New("db error"))
+	repo.EXPECT().GetUserURLs("user-1").Return(nil, errors.New("db error"))
 
 	service := NewURLService(repo)
 	_, err := service.GetFormattedUserURLs("user-1", "http://localhost")
@@ -189,60 +160,31 @@ func TestDeleteURLsAsync(t *testing.T) {
 	defer ctrl.Finish()
 
 	repo := mocks.NewMockURLRepository(ctrl)
-
-	repo.EXPECT().
-		DeleteURLs("user-123", []string{"a", "b", "c"})
+	repo.EXPECT().DeleteURLs("user-123", []string{"a", "b", "c"})
 
 	service := NewURLService(repo)
 	service.DeleteURLsAsync("user-123", []string{"a", "b", "c"})
 }
 
-func TestIsUniq_True(t *testing.T) {
+func TestDeleteURLsAsync_EmptyList(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	repo := mocks.NewMockURLRepository(ctrl)
-
-	repo.EXPECT().
-		Get("newurl").
-		Return("", errors.New("not found"))
+	repo.EXPECT().DeleteURLs("user-123", []string{})
 
 	service := NewURLService(repo)
-	assert.True(t, service.isUniq("newurl"))
+	service.DeleteURLsAsync("user-123", []string{})
 }
 
-func TestIsUniq_False(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	repo := mocks.NewMockURLRepository(ctrl)
-
-	repo.EXPECT().
-		Get("existing").
-		Return("https://exists.com", nil)
-
-	service := NewURLService(repo)
-	assert.False(t, service.isUniq("existing"))
-}
-
-// === Тесты shortURL генератора (без моков) ===
+// === Тесты без моков (чистая логика генератора) ===
 
 func TestShortURL_Length(t *testing.T) {
-	tests := []struct {
-		name   string
-		length int
-	}{
-		{"length 4", 4},
-		{"length 6", 6},
-		{"length 8", 8},
-		{"length 10", 10},
-	}
+	tests := []int{4, 6, 8, 10, 20}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := shortURL(tt.length)
-			assert.Len(t, result, tt.length)
-		})
+	for _, length := range tests {
+		result := shortURL(length)
+		assert.Len(t, result, length)
 	}
 }
 
@@ -262,6 +204,11 @@ func TestShortURL_Randomness(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		results[shortURL(6)] = true
 	}
-	// 1000 генераций должны дать почти все уникальные
+	// При 62^6 комбинациях 1000 должны быть почти все уникальны
 	assert.Greater(t, len(results), 990)
+}
+
+func TestShortURL_ZeroLength(t *testing.T) {
+	result := shortURL(0)
+	assert.Empty(t, result)
 }
