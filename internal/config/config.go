@@ -8,9 +8,10 @@ import (
 )
 
 const (
-	DefaultServerAddr = ":8080"
-	DefaultBaseURL    = "http://localhost:8080"
-	DefaultFilePath   = "storage.json"
+	DefaultServerAddr    = ":8080"
+	DefaultBaseURL       = "http://localhost:8080"
+	DefaultFilePath      = "storage.json"
+	DefaultAuditFilePath = "audit_storage.json"
 )
 
 type Config struct {
@@ -19,6 +20,8 @@ type Config struct {
 	FilePath   string `env:"FILE_STORAGE_PATH"`
 	DBurl      string `env:"DATABASE_DSN"`
 	SecretKey  string `env:"KEY"`
+	AuditFile  string `env:"AUDIT_FILE"`
+	AuditURL   string `env:"AUDIT_URL"`
 }
 
 func (c *Config) getArgsFromCli() {
@@ -27,6 +30,8 @@ func (c *Config) getArgsFromCli() {
 	flag.StringVar(&c.FilePath, "f", DefaultFilePath, "file storage path")
 	flag.StringVar(&c.DBurl, "d", "", "DBurl")
 	flag.StringVar(&c.SecretKey, "k", "", "secret key")
+	flag.StringVar(&c.AuditFile, "audit-file", DefaultAuditFilePath, "audit file path")
+	flag.StringVar(&c.AuditURL, "audit-url", "", "audit server URL")
 	flag.Parse()
 }
 
@@ -58,4 +63,11 @@ func (c Config) GetBaseURL() string {
 
 func (c Config) GetFilePath() string {
 	return c.FilePath
+}
+func (c Config) GetAuditFile() string {
+	return c.AuditFile
+}
+
+func (c Config) GetAuditURL() string {
+	return c.AuditURL
 }
