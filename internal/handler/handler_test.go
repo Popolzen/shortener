@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Popolzen/shortener/internal/audit"
 	"github.com/Popolzen/shortener/internal/config"
 	"github.com/Popolzen/shortener/internal/model"
 	"github.com/Popolzen/shortener/internal/repository/mocks"
@@ -44,11 +45,12 @@ func TestGetHandler_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	pub := audit.NewPublisher()
 	router, repo := setupTestRouter(ctrl)
 	repo.EXPECT().Get("abc123").Return("https://example.com", nil)
 
 	urlService := shortener.NewURLService(repo)
-	router.GET("/:id", GetHandler(urlService))
+	router.GET("/:id", GetHandler(urlService, pub))
 
 	req := httptest.NewRequest(http.MethodGet, "/abc123", nil)
 	w := httptest.NewRecorder()
@@ -62,11 +64,12 @@ func TestGetHandler_NotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	pub := audit.NewPublisher()
 	router, repo := setupTestRouter(ctrl)
 	repo.EXPECT().Get("notfound").Return("", errors.New("not found"))
 
 	urlService := shortener.NewURLService(repo)
-	router.GET("/:id", GetHandler(urlService))
+	router.GET("/:id", GetHandler(urlService, pub))
 
 	req := httptest.NewRequest(http.MethodGet, "/notfound", nil)
 	w := httptest.NewRecorder()
@@ -79,11 +82,12 @@ func TestGetHandler_Deleted(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	pub := audit.NewPublisher()
 	router, repo := setupTestRouter(ctrl)
 	repo.EXPECT().Get("deleted").Return("", model.ErrURLDeleted)
 
 	urlService := shortener.NewURLService(repo)
-	router.GET("/:id", GetHandler(urlService))
+	router.GET("/:id", GetHandler(urlService, pub))
 
 	req := httptest.NewRequest(http.MethodGet, "/deleted", nil)
 	w := httptest.NewRecorder()
@@ -98,13 +102,14 @@ func TestPostHandler_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	pub := audit.NewPublisher()
 	router, repo := setupTestRouter(ctrl)
 
 	repo.EXPECT().Get(gomock.Any()).Return("", errors.New("not found"))
 	repo.EXPECT().Store(gomock.Any(), "https://example.com", "test-user-123").Return(nil)
 
 	urlService := shortener.NewURLService(repo)
-	router.POST("/", PostHandler(urlService, testConfig()))
+	router.POST("/", PostHandler(urlService, testConfig(), pub))
 
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://example.com"))
 	w := httptest.NewRecorder()
@@ -118,13 +123,14 @@ func TestPostHandler_StoreError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	pub := audit.NewPublisher()
 	router, repo := setupTestRouter(ctrl)
 
 	repo.EXPECT().Get(gomock.Any()).Return("", errors.New("not found"))
 	repo.EXPECT().Store(gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New("db error"))
 
 	urlService := shortener.NewURLService(repo)
-	router.POST("/", PostHandler(urlService, testConfig()))
+	router.POST("/", PostHandler(urlService, testConfig(), pub))
 
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://example.com"))
 	w := httptest.NewRecorder()
@@ -139,13 +145,14 @@ func TestPostHandlerJSON_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	pub := audit.NewPublisher()
 	router, repo := setupTestRouter(ctrl)
 
 	repo.EXPECT().Get(gomock.Any()).Return("", errors.New("not found"))
 	repo.EXPECT().Store(gomock.Any(), "https://example.com", "test-user-123").Return(nil)
 
 	urlService := shortener.NewURLService(repo)
-	router.POST("/api/shorten", PostHandlerJSON(urlService, testConfig()))
+	router.POST("/api/shorten", PostHandlerJSON(urlService, testConfig(), pub))
 
 	body, _ := json.Marshal(model.URL{URL: "https://example.com"})
 	req := httptest.NewRequest(http.MethodPost, "/api/shorten", bytes.NewReader(body))
@@ -164,10 +171,11 @@ func TestPostHandlerJSON_InvalidJSON(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	pub := audit.NewPublisher()
 	router, _ := setupTestRouter(ctrl)
 
 	urlService := shortener.NewURLService(nil)
-	router.POST("/api/shorten", PostHandlerJSON(urlService, testConfig()))
+	router.POST("/api/shorten", PostHandlerJSON(urlService, testConfig(), pub))
 
 	req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader("invalid"))
 	w := httptest.NewRecorder()
