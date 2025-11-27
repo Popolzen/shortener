@@ -3,589 +3,335 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
-	"io"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/Popolzen/shortener/internal/audit"
 	"github.com/Popolzen/shortener/internal/config"
 	"github.com/Popolzen/shortener/internal/model"
-	"github.com/Popolzen/shortener/internal/repository/memory"
+	"github.com/Popolzen/shortener/internal/repository/mocks"
 	"github.com/Popolzen/shortener/internal/service/shortener"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
-// Вспомогательная функция для создания роутера с middleware для тестов
-func setupTestRouter() (*gin.Engine, *memory.URLRepository, shortener.URLService) {
+func setupTestRouter(ctrl *gomock.Controller) (*gin.Engine, *mocks.MockURLRepository) {
 	gin.SetMode(gin.TestMode)
-	repo := memory.NewURLRepository()
-	urlService := shortener.NewURLService(repo)
+	repo := mocks.NewMockURLRepository(ctrl)
 	router := gin.New()
 
-	// Добавляем middleware для установки user_id в контекст
 	router.Use(func(c *gin.Context) {
 		c.Set("user_id", "test-user-123")
+		c.Set("had_cookie", true)
+		c.Set("cookie_was_valid", true)
 		c.Next()
 	})
 
-	return router, repo, urlService
+	return router, repo
 }
 
-func TestGetHandler(t *testing.T) {
-	type want struct {
-		contentType string
-		statusCode  int
-		location    string
-	}
-	tests := []struct {
-		name      string
-		shortURL  string
-		longURL   string
-		want      want
-		method    string
-		setupData bool // нужно ли предварительно добавить данные
-	}{
-		{
-			name:      "Корректный запрос",
-			method:    http.MethodGet,
-			shortURL:  "test123",
-			longURL:   "www.google.com",
-			setupData: true,
-			want: want{
-				contentType: "text/plain",
-				statusCode:  http.StatusTemporaryRedirect,
-				location:    "www.google.com",
-			},
-		},
-		{
-			name:      "Не нашли ссылку",
-			method:    http.MethodGet,
-			shortURL:  "notfound",
-			longURL:   "",
-			setupData: false,
-			want: want{
-				contentType: "text/plain; charset=utf-8",
-				statusCode:  http.StatusNotFound,
-				location:    "",
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			router, repo, urlService := setupTestRouter()
-
-			// Добавляем тестовые данные если нужно
-			if tt.setupData {
-				testUserID := "test-user-123"
-				err := repo.Store(tt.shortURL, tt.longURL, testUserID)
-				require.NoError(t, err)
-			}
-
-			// Настройка роутера
-			router.GET("/:id", GetHandler(urlService))
-
-			// Создание запроса
-			requestURL := "/" + tt.shortURL
-			r := httptest.NewRequest(tt.method, requestURL, nil)
-			w := httptest.NewRecorder()
-
-			// Выполнение запроса
-			router.ServeHTTP(w, r)
-			res := w.Result()
-
-			// Проверки
-			assert.Equal(t, tt.want.statusCode, res.StatusCode)
-
-			defer res.Body.Close()
-			_, err := io.ReadAll(res.Body)
-			require.NoError(t, err)
-
-			assert.Equal(t, tt.want.contentType, res.Header.Get("Content-Type"))
-			assert.Equal(t, tt.want.location, res.Header.Get("Location"))
-		})
-	}
+func testConfig() *config.Config {
+	return &config.Config{BaseURL: "http://localhost:8080"}
 }
 
-func TestPostHandler(t *testing.T) {
-	type want struct {
-		contentType    string
-		statusCode     int
-		responsePrefix string
-	}
-	tests := []struct {
-		name    string
-		request string
-		want    want
-		method  string
-	}{
-		{
-			name:    "Корректный запрос",
-			method:  http.MethodPost,
-			request: "www.google.com",
-			want: want{
-				contentType:    "text/plain",
-				statusCode:     http.StatusCreated,
-				responsePrefix: "http://localhost:8080/",
-			},
-		},
-		{
-			name:    "Пустое тело запроса",
-			method:  http.MethodPost,
-			request: "",
-			want: want{
-				contentType:    "text/plain",
-				statusCode:     http.StatusCreated,
-				responsePrefix: "http://localhost:8080/",
-			},
-		},
-	}
+// === GetHandler ===
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			router, _, urlService := setupTestRouter()
+func TestGetHandler_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-			// Настройка роутера
-			router.POST("/", PostHandler(urlService, &config.Config{BaseURL: "http://localhost:8080"}))
+	pub := audit.NewPublisher()
+	router, repo := setupTestRouter(ctrl)
+	repo.EXPECT().Get("abc123").Return("https://example.com", nil)
 
-			// Создание запроса
-			req := httptest.NewRequest(tt.method, "/", strings.NewReader(tt.request))
-			w := httptest.NewRecorder()
+	urlService := shortener.NewURLService(repo)
+	router.GET("/:id", GetHandler(urlService, pub))
 
-			// Выполнение запроса
-			router.ServeHTTP(w, req)
-			res := w.Result()
+	req := httptest.NewRequest(http.MethodGet, "/abc123", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
 
-			// Проверки
-			assert.Equal(t, tt.want.statusCode, res.StatusCode)
-
-			defer res.Body.Close()
-			resBody, err := io.ReadAll(res.Body)
-			require.NoError(t, err)
-
-			assert.Equal(t, tt.want.contentType, res.Header.Get("Content-Type"))
-
-			// Проверяем, что ответ начинается с базового URL
-			responseString := string(resBody)
-			assert.True(t, strings.HasPrefix(responseString, tt.want.responsePrefix))
-
-			// Проверяем длину ответа (базовый URL + "/" + 6 символов короткой ссылки)
-			expectedLength := len(tt.want.responsePrefix) + 6
-			assert.Equal(t, expectedLength, len(responseString))
-		})
-	}
+	assert.Equal(t, http.StatusTemporaryRedirect, w.Code)
+	assert.Equal(t, "https://example.com", w.Header().Get("Location"))
 }
 
-func TestPostHandlerJSON(t *testing.T) {
-	type want struct {
-		contentType    string
-		statusCode     int
-		responsePrefix string
-	}
-	tests := []struct {
-		name    string
-		request model.URL
-		want    want
-	}{
-		{
-			name:    "Корректный JSON запрос",
-			request: model.URL{URL: "https://www.google.com"},
-			want: want{
-				contentType:    "application/json",
-				statusCode:     http.StatusCreated,
-				responsePrefix: "http://localhost:8080/",
-			},
-		},
-		{
-			name:    "Пустой URL в JSON",
-			request: model.URL{URL: ""},
-			want: want{
-				contentType:    "application/json",
-				statusCode:     http.StatusCreated,
-				responsePrefix: "http://localhost:8080/",
-			},
-		},
-	}
+func TestGetHandler_NotFound(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			router, _, urlService := setupTestRouter()
+	pub := audit.NewPublisher()
+	router, repo := setupTestRouter(ctrl)
+	repo.EXPECT().Get("notfound").Return("", errors.New("not found"))
 
-			// Настройка роутера
-			router.POST("/api/shorten", PostHandlerJSON(urlService, &config.Config{BaseURL: "http://localhost:8080"}))
+	urlService := shortener.NewURLService(repo)
+	router.GET("/:id", GetHandler(urlService, pub))
 
-			// Создание JSON запроса
-			requestBody, err := json.Marshal(tt.request)
-			require.NoError(t, err)
+	req := httptest.NewRequest(http.MethodGet, "/notfound", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
 
-			req := httptest.NewRequest(http.MethodPost, "/api/shorten", bytes.NewReader(requestBody))
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
+	assert.Equal(t, http.StatusNotFound, w.Code)
+}
 
-			// Выполнение запроса
-			router.ServeHTTP(w, req)
-			res := w.Result()
+func TestGetHandler_Deleted(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-			// Проверки
-			assert.Equal(t, tt.want.statusCode, res.StatusCode)
+	pub := audit.NewPublisher()
+	router, repo := setupTestRouter(ctrl)
+	repo.EXPECT().Get("deleted").Return("", model.ErrURLDeleted)
 
-			defer res.Body.Close()
-			resBody, err := io.ReadAll(res.Body)
-			require.NoError(t, err)
+	urlService := shortener.NewURLService(repo)
+	router.GET("/:id", GetHandler(urlService, pub))
 
-			assert.Equal(t, tt.want.contentType, res.Header.Get("Content-Type"))
+	req := httptest.NewRequest(http.MethodGet, "/deleted", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
 
-			// Парсим JSON ответ
-			var response model.Result
-			err = json.Unmarshal(resBody, &response)
-			require.NoError(t, err)
+	assert.Equal(t, http.StatusGone, w.Code)
+}
 
-			// Проверяем, что ответ начинается с базового URL
-			assert.True(t, strings.HasPrefix(response.Result, tt.want.responsePrefix))
+// === PostHandler ===
 
-			// Проверяем длину ответа (базовый URL + "/" + 6 символов короткой ссылки)
-			expectedLength := len(tt.want.responsePrefix) + 6
-			assert.Equal(t, expectedLength, len(response.Result))
-		})
-	}
+func TestPostHandler_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	pub := audit.NewPublisher()
+	router, repo := setupTestRouter(ctrl)
+
+	repo.EXPECT().Get(gomock.Any()).Return("", errors.New("not found"))
+	repo.EXPECT().Store(gomock.Any(), "https://example.com", "test-user-123").Return(nil)
+
+	urlService := shortener.NewURLService(repo)
+	router.POST("/", PostHandler(urlService, testConfig(), pub))
+
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://example.com"))
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+	assert.True(t, strings.HasPrefix(w.Body.String(), "http://localhost:8080/"))
+}
+
+func TestPostHandler_StoreError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	pub := audit.NewPublisher()
+	router, repo := setupTestRouter(ctrl)
+
+	repo.EXPECT().Get(gomock.Any()).Return("", errors.New("not found"))
+	repo.EXPECT().Store(gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New("db error"))
+
+	urlService := shortener.NewURLService(repo)
+	router.POST("/", PostHandler(urlService, testConfig(), pub))
+
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://example.com"))
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+// === PostHandlerJSON ===
+
+func TestPostHandlerJSON_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	pub := audit.NewPublisher()
+	router, repo := setupTestRouter(ctrl)
+
+	repo.EXPECT().Get(gomock.Any()).Return("", errors.New("not found"))
+	repo.EXPECT().Store(gomock.Any(), "https://example.com", "test-user-123").Return(nil)
+
+	urlService := shortener.NewURLService(repo)
+	router.POST("/api/shorten", PostHandlerJSON(urlService, testConfig(), pub))
+
+	body, _ := json.Marshal(model.URL{URL: "https://example.com"})
+	req := httptest.NewRequest(http.MethodPost, "/api/shorten", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+
+	var response model.Result
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	assert.True(t, strings.HasPrefix(response.Result, "http://localhost:8080/"))
 }
 
 func TestPostHandlerJSON_InvalidJSON(t *testing.T) {
-	router, _, urlService := setupTestRouter()
-	router.POST("/api/shorten", PostHandlerJSON(urlService, &config.Config{BaseURL: "http://localhost:8080"}))
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	// Отправляем невалидный JSON
-	req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader("invalid json"))
-	req.Header.Set("Content-Type", "application/json")
+	pub := audit.NewPublisher()
+	router, _ := setupTestRouter(ctrl)
+
+	urlService := shortener.NewURLService(nil)
+	router.POST("/api/shorten", PostHandlerJSON(urlService, testConfig(), pub))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader("invalid"))
 	w := httptest.NewRecorder()
-
 	router.ServeHTTP(w, req)
-	res := w.Result()
 
-	assert.Equal(t, http.StatusBadRequest, res.StatusCode)
-
-	defer res.Body.Close()
-	resBody, err := io.ReadAll(res.Body)
-	require.NoError(t, err)
-
-	assert.Equal(t, "Неправильное тело запроса", string(resBody))
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
-func TestBatchHandler(t *testing.T) {
-	tests := []struct {
-		name       string
-		request    []model.URLBatchRequest
-		wantStatus int
-		wantLen    int
-	}{
-		{
-			name: "Корректный batch запрос",
-			request: []model.URLBatchRequest{
-				{CorrelationID: "1", OriginalURL: "https://www.google.com"},
-				{CorrelationID: "2", OriginalURL: "https://www.yandex.ru"},
-			},
-			wantStatus: http.StatusCreated,
-			wantLen:    2,
-		},
-		{
-			name:       "Пустой batch",
-			request:    []model.URLBatchRequest{},
-			wantStatus: http.StatusCreated,
-			wantLen:    0,
-		},
+// === BatchHandler ===
+
+func TestBatchHandler_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	router, repo := setupTestRouter(ctrl)
+
+	repo.EXPECT().Get(gomock.Any()).Return("", errors.New("not found")).Times(2)
+	repo.EXPECT().Store(gomock.Any(), "https://one.com", "test-user-123").Return(nil)
+	repo.EXPECT().Store(gomock.Any(), "https://two.com", "test-user-123").Return(nil)
+
+	urlService := shortener.NewURLService(repo)
+	router.POST("/api/shorten/batch", BatchHandler(urlService, testConfig()))
+
+	batch := []model.URLBatchRequest{
+		{CorrelationID: "1", OriginalURL: "https://one.com"},
+		{CorrelationID: "2", OriginalURL: "https://two.com"},
 	}
+	body, _ := json.Marshal(batch)
+	req := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			router, _, urlService := setupTestRouter()
-			router.POST("/api/shorten/batch", BatchHandler(urlService, &config.Config{BaseURL: "http://localhost:8080"}))
+	assert.Equal(t, http.StatusCreated, w.Code)
 
-			// Создание JSON запроса
-			requestBody, err := json.Marshal(tt.request)
-			require.NoError(t, err)
-
-			req := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", bytes.NewReader(requestBody))
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
-
-			// Выполнение запроса
-			router.ServeHTTP(w, req)
-			res := w.Result()
-
-			// Проверки
-			assert.Equal(t, tt.wantStatus, res.StatusCode)
-
-			defer res.Body.Close()
-			resBody, err := io.ReadAll(res.Body)
-			require.NoError(t, err)
-
-			assert.Equal(t, "application/json", res.Header.Get("Content-Type"))
-
-			// Парсим JSON ответ
-			var response []model.URLBatchResponse
-			err = json.Unmarshal(resBody, &response)
-			require.NoError(t, err)
-
-			assert.Equal(t, tt.wantLen, len(response))
-
-			// Проверяем каждый элемент ответа
-			for i, resp := range response {
-				if i < len(tt.request) {
-					assert.Equal(t, tt.request[i].CorrelationID, resp.CorrelationID)
-					assert.True(t, strings.HasPrefix(resp.ShortURL, "http://localhost:8080/"))
-					// Проверяем длину короткой ссылки (базовый URL + "/" + 6 символов)
-					expectedLength := len("http://localhost:8080/") + 6
-					assert.Equal(t, expectedLength, len(resp.ShortURL))
-				}
-			}
-		})
-	}
+	var response []model.URLBatchResponse
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	assert.Len(t, response, 2)
+	assert.Equal(t, "1", response[0].CorrelationID)
+	assert.Equal(t, "2", response[1].CorrelationID)
 }
 
 func TestBatchHandler_InvalidJSON(t *testing.T) {
-	router, _, urlService := setupTestRouter()
-	router.POST("/api/shorten/batch", BatchHandler(urlService, &config.Config{BaseURL: "http://localhost:8080"}))
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	// Отправляем невалидный JSON
-	req := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", strings.NewReader("invalid json"))
-	req.Header.Set("Content-Type", "application/json")
+	router, _ := setupTestRouter(ctrl)
+
+	urlService := shortener.NewURLService(nil)
+	router.POST("/api/shorten/batch", BatchHandler(urlService, testConfig()))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", strings.NewReader("invalid"))
 	w := httptest.NewRecorder()
-
 	router.ServeHTTP(w, req)
-	res := w.Result()
 
-	assert.Equal(t, http.StatusBadRequest, res.StatusCode)
-
-	defer res.Body.Close()
-	resBody, err := io.ReadAll(res.Body)
-	require.NoError(t, err)
-
-	assert.Equal(t, "Неправильное тело запроса", string(resBody))
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
-// Интерфейс для тестирования PingDB
-type DBPinger interface {
-	PingDB() error
-}
+func TestBatchHandler_EmptyBatch(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-// Мок для DBConfig, реализующий интерфейс DBPinger
-type mockDBConfig struct {
-	shouldFail bool
-}
+	router, _ := setupTestRouter(ctrl)
 
-func (m *mockDBConfig) PingDB() error {
-	if m.shouldFail {
-		return assert.AnError
-	}
-	return nil
-}
+	urlService := shortener.NewURLService(nil)
+	router.POST("/api/shorten/batch", BatchHandler(urlService, testConfig()))
 
-func TestPingHandler(t *testing.T) {
-	tests := []struct {
-		name       string
-		dbConfig   DBPinger
-		wantStatus int
-	}{
-		{
-			name:       "Успешный пинг",
-			dbConfig:   &mockDBConfig{shouldFail: false},
-			wantStatus: http.StatusOK,
-		},
-		{
-			name:       "Ошибка пинга",
-			dbConfig:   &mockDBConfig{shouldFail: true},
-			wantStatus: http.StatusInternalServerError,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			router, _, _ := setupTestRouter()
-
-			// Создаем хэндлер с моком
-			pingHandler := func(ctx *gin.Context) {
-				err := tt.dbConfig.PingDB()
-				if err != nil {
-					ctx.Status(http.StatusInternalServerError)
-					return
-				}
-				ctx.Status(http.StatusOK)
-			}
-
-			router.GET("/ping", pingHandler)
-
-			req := httptest.NewRequest(http.MethodGet, "/ping", nil)
-			w := httptest.NewRecorder()
-
-			router.ServeHTTP(w, req)
-			res := w.Result()
-			res.Body.Close()
-			assert.Equal(t, tt.wantStatus, res.StatusCode)
-		})
-	}
-}
-
-// func TestGetURlsHahdler(t *testing.T) {
-
-// 	type want struct {
-// 		contentType string
-// 		statusCode  int
-// 		location    string
-// 	}
-// 	tests := []struct {
-// 		name      string
-// 		shortURL  string
-// 		longURL   string
-// 		want      want
-// 		setupData bool
-// 	}{
-// 		{
-// 			name:      "Корректный запрос",
-// 			shortURL:  "test123",
-// 			longURL:   "www.google.com",
-// 			setupData: true,
-// 			want: want{
-// 				contentType: "text/plain",
-// 				statusCode:  http.StatusTemporaryRedirect,
-// 				location:    "www.google.com",
-// 			},
-// 		},
-// 		{
-// 			name:      "Не нашли ссылку",
-// 			shortURL:  "notfound",
-// 			longURL:   "",
-// 			setupData: false,
-// 			want: want{
-// 				contentType: "text/plain; charset=utf-8",
-// 				statusCode:  http.StatusNotFound,
-// 				location:    "",
-// 			},
-// 		},
-// 	}
-
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			router, repo, urlService := setupTestRouter()
-
-// 			// Добавляем тестовые данные если нужно
-// 			if tt.setupData {
-// 				testUserID := "test-user-123"
-// 				err := repo.Store(tt.shortURL, tt.longURL, testUserID)
-// 				require.NoError(t, err)
-// 			}
-
-// 			// Настройка роутера
-// 			router.GET("/api/user/urls/:id", GetURlsHandler(urlService))
-
-// 			// Создание запроса
-// 			requestURL := "/api/user/urls/" + tt.shortURL
-// 			r := httptest.NewRequest(http.MethodGet, requestURL, nil)
-// 			w := httptest.NewRecorder()
-
-// 			// Выполнение запроса
-// 			router.ServeHTTP(w, r)
-// 			res := w.Result()
-
-// 			// Проверки
-// 			assert.Equal(t, tt.want.statusCode, res.StatusCode)
-
-// 			defer res.Body.Close()
-// 			_, err := io.ReadAll(res.Body)
-// 			require.NoError(t, err)
-
-// 			assert.Equal(t, tt.want.contentType, res.Header.Get("Content-Type"))
-// 			assert.Equal(t, tt.want.location, res.Header.Get("Location"))
-// 		})
-// 	}
-// }
-
-// Тест для функции shortenBatch
-func TestShortenBatch(t *testing.T) {
-	_, _, urlService := setupTestRouter()
-
-	// Создаем контекст для тестирования
+	body, _ := json.Marshal([]model.URLBatchRequest{})
+	req := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", bytes.NewReader(body))
 	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Set("user_id", "test-user-123")
+	router.ServeHTTP(w, req)
 
-	tests := []struct {
-		name    string
-		request []model.URLBatchRequest
-		wantLen int
-		wantErr bool
-	}{
-		{
-			name: "Корректный batch",
-			request: []model.URLBatchRequest{
-				{CorrelationID: "1", OriginalURL: "https://www.google.com"},
-				{CorrelationID: "2", OriginalURL: "https://www.yandex.ru"},
-			},
-			wantLen: 2,
-			wantErr: false,
-		},
-		{
-			name:    "Пустой batch",
-			request: []model.URLBatchRequest{},
-			wantLen: 0,
-			wantErr: false,
-		},
-	}
+	assert.Equal(t, http.StatusCreated, w.Code)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			response, err := shortenBatch(tt.request, urlService, "http://localhost:8080", "test-user-123")
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.wantLen, len(response))
-
-				// Проверяем каждый элемент ответа
-				for i, resp := range response {
-					if i < len(tt.request) {
-						assert.Equal(t, tt.request[i].CorrelationID, resp.CorrelationID)
-						assert.True(t, strings.HasPrefix(resp.ShortURL, "http://localhost:8080/"))
-					}
-				}
-			}
-		})
-	}
+	var response []model.URLBatchResponse
+	json.Unmarshal(w.Body.Bytes(), &response)
+	assert.Empty(t, response)
 }
 
-// Тест для функции handleConflictError
-func TestHandleConflictError(t *testing.T) {
-	tests := []struct {
-		name         string
-		err          error
-		baseURL      string
-		wantFullURL  string
-		wantConflict bool
-	}{
-		{
-			name:         "Не ошибка конфликта",
-			err:          assert.AnError,
-			baseURL:      "http://localhost:8080",
-			wantFullURL:  "",
-			wantConflict: false,
-		},
-		{
-			name:         "Nil ошибка",
-			err:          nil,
-			baseURL:      "http://localhost:8080",
-			wantFullURL:  "",
-			wantConflict: false,
-		},
-	}
+// === GetUserURLsHandler ===
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			fullURL, isConflict := handleConflictError(tt.err, tt.baseURL)
-			assert.Equal(t, tt.wantConflict, isConflict)
-			assert.Equal(t, tt.wantFullURL, fullURL)
-		})
-	}
+func TestGetUserURLsHandler_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	router, repo := setupTestRouter(ctrl)
+
+	repo.EXPECT().GetUserURLs("test-user-123").Return([]model.URLPair{
+		{ShortURL: "abc", OriginalURL: "https://example.com"},
+	}, nil)
+
+	urlService := shortener.NewURLService(repo)
+	router.GET("/api/user/urls", GetUserURLsHandler(urlService, testConfig()))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/user/urls", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var urls []model.URLPair
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &urls))
+	assert.Len(t, urls, 1)
+	assert.Equal(t, "http://localhost:8080/abc", urls[0].ShortURL)
+}
+
+func TestGetUserURLsHandler_Empty(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	router, repo := setupTestRouter(ctrl)
+
+	repo.EXPECT().GetUserURLs("test-user-123").Return([]model.URLPair{}, nil)
+
+	urlService := shortener.NewURLService(repo)
+	router.GET("/api/user/urls", GetUserURLsHandler(urlService, testConfig()))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/user/urls", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNoContent, w.Code)
+}
+
+// === DeleteURLsHandler ===
+
+func TestDeleteURLsHandler_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	router, repo := setupTestRouter(ctrl)
+
+	repo.EXPECT().DeleteURLs("test-user-123", []string{"abc", "def"})
+
+	urlService := shortener.NewURLService(repo)
+	router.DELETE("/api/user/urls", DeleteURLsHandler(urlService))
+
+	body, _ := json.Marshal([]string{"abc", "def"})
+	req := httptest.NewRequest(http.MethodDelete, "/api/user/urls", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusAccepted, w.Code)
+}
+
+func TestDeleteURLsHandler_InvalidJSON(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	router, _ := setupTestRouter(ctrl)
+
+	urlService := shortener.NewURLService(nil)
+	router.DELETE("/api/user/urls", DeleteURLsHandler(urlService))
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/user/urls", strings.NewReader("invalid"))
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 }

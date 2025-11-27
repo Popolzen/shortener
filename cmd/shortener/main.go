@@ -6,6 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/Popolzen/shortener/internal/audit"
 	"github.com/Popolzen/shortener/internal/config"
 	"github.com/Popolzen/shortener/internal/db"
 	"github.com/Popolzen/shortener/internal/handler"
@@ -30,6 +31,10 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	cfg := config.NewConfig()
 	dbCfg := db.NewDBConfig(*cfg)
+
+	// Инициализируем паблишера
+	publisher := initAudit(cfg)
+
 	// Инициализируем репозиторий
 	repo := initRepository(cfg, dbCfg)
 
@@ -37,7 +42,7 @@ func main() {
 	shortener := shortener.NewURLService(repo)
 
 	// Настраиваем роутер
-	r := setupRouter(shortener, cfg, dbCfg)
+	r := setupRouter(shortener, cfg, dbCfg, publisher)
 
 	// Запускаем сервер
 	addr := cfg.GetAddress()
@@ -98,17 +103,42 @@ func setupGracefulShutdown(repo repository.URLRepository) {
 	}()
 }
 
+// initAudit - функция инициализации аудита:
+func initAudit(cfg *config.Config) *audit.Publisher {
+	publisher := audit.NewPublisher()
+
+	// Файловый observer
+	if cfg.GetAuditFile() != "" {
+		fileObs, err := audit.NewFileObserver(cfg.GetAuditFile())
+		if err != nil {
+			log.Printf("Не удалось создать file observer: %v", err)
+		} else {
+			publisher.Subscribe(fileObs)
+			log.Printf("Аудит в файл: %s", cfg.GetAuditFile())
+		}
+	}
+
+	// HTTP observer
+	if cfg.GetAuditURL() != "" {
+		httpObs := audit.NewHTTPObserver(cfg.GetAuditURL())
+		publisher.Subscribe(httpObs)
+		log.Printf("Аудит на сервер: %s", cfg.GetAuditURL())
+	}
+
+	return publisher
+}
+
 // setupRouter настраивает роуты и middleware
-func setupRouter(shortener shortener.URLService, cfg *config.Config, dbCfg db.DBConfig) *gin.Engine {
+func setupRouter(shortener shortener.URLService, cfg *config.Config, dbCfg db.DBConfig, auditPub *audit.Publisher) *gin.Engine {
 	r := gin.Default()
 	r.Use(logger.RequestLogger())
 	r.Use(compressor.Compresser())
 	r.Use(auth.AuthMiddleware(cfg))
 
-	r.POST("/", handler.PostHandler(shortener, cfg))
-	r.POST("/api/shorten", handler.PostHandlerJSON(shortener, cfg))
+	r.POST("/", handler.PostHandler(shortener, cfg, auditPub))
+	r.POST("/api/shorten", handler.PostHandlerJSON(shortener, cfg, auditPub))
 	r.POST("/api/shorten/batch", handler.BatchHandler(shortener, cfg))
-	r.GET("/:id", handler.GetHandler(shortener))
+	r.GET("/:id", handler.GetHandler(shortener, auditPub))
 	r.GET("/api/user/urls", handler.GetUserURLsHandler(shortener, cfg))
 	r.DELETE("/api/user/urls", handler.DeleteURLsHandler(shortener))
 

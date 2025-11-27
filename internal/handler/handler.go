@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Popolzen/shortener/internal/audit"
 	"github.com/Popolzen/shortener/internal/config"
 	"github.com/Popolzen/shortener/internal/db"
 	"github.com/Popolzen/shortener/internal/model"
@@ -32,7 +33,7 @@ func getUserID(c *gin.Context) (string, bool) {
 }
 
 // PostHandler создает короткую ссылку
-func PostHandler(urlService shortener.URLService, cfg *config.Config) gin.HandlerFunc {
+func PostHandler(urlService shortener.URLService, cfg *config.Config, auditPub *audit.Publisher) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Читаем тело запроса
 		body, err := io.ReadAll(c.Request.Body)
@@ -47,7 +48,8 @@ func PostHandler(urlService shortener.URLService, cfg *config.Config) gin.Handle
 			return
 		}
 
-		shortURL, err := urlService.Shorten(string(body), userID)
+		longURL := string(body)
+		shortURL, err := urlService.Shorten(longURL, userID)
 
 		if fullShortURL, isConflict := handleConflictError(err, cfg.BaseURL); isConflict {
 			c.Header("Content-Type", "text/plain")
@@ -64,11 +66,14 @@ func PostHandler(urlService shortener.URLService, cfg *config.Config) gin.Handle
 		c.Header("Content-Type", "text/plain")
 		c.Header("Content-Length", strconv.Itoa(len(fullShortURL)))
 		c.String(http.StatusCreated, fullShortURL)
+
+		auditPub.Publish(audit.NewEvent(audit.ActionShorten, userID, longURL))
 	}
+
 }
 
 // GetHandler перенаправляет по короткой ссылке
-func GetHandler(urlService shortener.URLService) gin.HandlerFunc {
+func GetHandler(urlService shortener.URLService, auditPub *audit.Publisher) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		shortURL := strings.TrimPrefix(c.Request.URL.Path, "/")
 		longURL, err := urlService.GetLongURL(shortURL)
@@ -84,6 +89,9 @@ func GetHandler(urlService shortener.URLService) gin.HandlerFunc {
 		c.Header("Location", longURL)
 		c.Header("Content-Type", "text/plain")
 		c.Status(http.StatusTemporaryRedirect)
+
+		userID, _ := getUserID(c)
+		auditPub.Publish(audit.NewEvent(audit.ActionFollow, userID, longURL))
 	}
 }
 
@@ -126,7 +134,7 @@ func GetUserURLsHandler(urlService shortener.URLService, cfg *config.Config) gin
 }
 
 // PostHandlerJSON создает короткую ссылку, принимает json, возвращает json.
-func PostHandlerJSON(urlService shortener.URLService, cfg *config.Config) gin.HandlerFunc {
+func PostHandlerJSON(urlService shortener.URLService, cfg *config.Config, auditPub *audit.Publisher) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var request model.URL
 
@@ -166,6 +174,8 @@ func PostHandlerJSON(urlService shortener.URLService, cfg *config.Config) gin.Ha
 		c.Header("Content-Type", "application/json")
 		c.JSON(http.StatusCreated, response)
 		c.Header("Content-Length", strconv.Itoa(len(fullShortURL)))
+
+		auditPub.Publish(audit.NewEvent(audit.ActionShorten, userID, request.URL))
 	}
 
 }
