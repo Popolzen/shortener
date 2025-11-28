@@ -11,6 +11,7 @@ import (
 	"github.com/Popolzen/shortener/internal/audit"
 	"github.com/Popolzen/shortener/internal/config"
 	"github.com/Popolzen/shortener/internal/db"
+	"github.com/Popolzen/shortener/internal/middleware/auth"
 	"github.com/Popolzen/shortener/internal/model"
 	"github.com/Popolzen/shortener/internal/repository/database"
 	"github.com/Popolzen/shortener/internal/service/shortener"
@@ -19,17 +20,12 @@ import (
 
 // getUserID извлекает userID
 func getUserID(c *gin.Context) (string, bool) {
-	userIDInterface, exists := c.Get("user_id")
-	if !exists {
-		return "", false
-	}
-
-	userID, ok := userIDInterface.(string)
+	val, ok := c.Get(string(auth.UserIDKey))
 	if !ok {
 		return "", false
 	}
-
-	return userID, true
+	uid, ok := val.(string)
+	return uid, ok
 }
 
 // PostHandler создает короткую ссылку
@@ -99,8 +95,9 @@ func GetHandler(urlService shortener.URLService, auditPub *audit.Publisher) gin.
 func GetUserURLsHandler(urlService shortener.URLService, cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Проверяем валидность куки (для 401 статуса)
-		hadCookie, _ := c.Get("had_cookie")
-		cookieWasValid, _ := c.Get("cookie_was_valid")
+
+		hadCookie, _ := c.Get(string(auth.HadCookieKey))
+		cookieWasValid, _ := c.Get(string(auth.CookieValidKey))
 
 		// Если была кука, но она невалидная - 401
 		if hadCookie.(bool) && !cookieWasValid.(bool) {

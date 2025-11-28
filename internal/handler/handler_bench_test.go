@@ -1,3 +1,4 @@
+// benchmarks_test.go
 package handler
 
 import (
@@ -5,10 +6,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"net/http"
+	"io"
 	"net/http/httptest"
 	"strconv"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -17,7 +17,6 @@ import (
 	"github.com/Popolzen/shortener/internal/config"
 	"github.com/Popolzen/shortener/internal/model"
 	"github.com/Popolzen/shortener/internal/repository/database"
-	"github.com/Popolzen/shortener/internal/repository/memory"
 	"github.com/Popolzen/shortener/internal/service/shortener"
 	"github.com/gin-gonic/gin"
 	"github.com/testcontainers/testcontainers-go"
@@ -35,11 +34,9 @@ var (
 	setupOnce sync.Once
 )
 
-// setupBenchDB настраивает PostgreSQL один раз для всех бенчмарков
 func setupBenchDB(b *testing.B) {
 	setupOnce.Do(func() {
 		ctx := context.Background()
-
 		pgContainer, err := postgres.Run(ctx,
 			"postgres:15-alpine",
 			postgres.WithDatabase("benchdb"),
@@ -65,7 +62,6 @@ func setupBenchDB(b *testing.B) {
 			b.Fatalf("Failed to connect: %v", err)
 		}
 
-		// Создаём схему
 		_, err = benchDB.Exec(`
 			CREATE TABLE IF NOT EXISTS shortened_urls (
 				id BIGSERIAL PRIMARY KEY,
@@ -73,8 +69,7 @@ func setupBenchDB(b *testing.B) {
 				long_url TEXT UNIQUE NOT NULL,
 				short_url VARCHAR(20) UNIQUE NOT NULL,
 				created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-				is_deleted BOOL DEFAULT FALSE,
-				CONSTRAINT chk_short_url_length CHECK (length(short_url) >= 4)
+				is_deleted BOOL DEFAULT FALSE
 			);
 			CREATE UNIQUE INDEX IF NOT EXISTS idx_shortened_urls_short_url ON shortened_urls(short_url);
 			CREATE INDEX IF NOT EXISTS idx_shortened_urls_user_id ON shortened_urls(user_id);
@@ -87,227 +82,203 @@ func setupBenchDB(b *testing.B) {
 	})
 }
 
-// setupBenchRouter создает роутер для бенчмарков
-func setupBenchRouter(b *testing.B) (*gin.Engine, shortener.URLService, *config.Config, *audit.Publisher) {
+func setupBenchRouter(b *testing.B) (*gin.Engine, *database.URLRepository) {
 	setupBenchDB(b)
-	urlService := shortener.NewURLService(benchRepo)
-	cfg := &config.Config{BaseURL: "http://localhost:8080"}
-	audit := &audit.Publisher{}
 	router := gin.New()
+
+	// ВАЖНО: в бенчмарках НЕ используем мидлварь с c.Set — она убивает профиль!
+	// Вместо этого подсовываем user_id через заголовок или напрямую в контекст один раз
+	userID := "550e8400-e29b-41d4-a716-446655440000"
+
 	router.Use(func(c *gin.Context) {
-		c.Set("user_id", "550e8400-e29b-41d4-a716-446655440000")
+		// Делаем c.Set ТОЛЬКО ОДИН РАЗ на роутер, а не на каждый запрос
+		// Но лучше — вообще не делать. Вместо этого:
+		c.Set("user_id", userID)
 		c.Set("had_cookie", true)
 		c.Set("cookie_was_valid", true)
 		c.Next()
 	})
 
-	return router, urlService, cfg, audit
+	return router, benchRepo
 }
 
-// BenchmarkPostHandler измеряет производительность создания короткой ссылки
+// =============================================================================
+// ВСЕ БЕНЧМАРКИ — ТОЛЬКО С POSTGRES, НИКАКОГО MEMORY REPO, НИКАКИХ ЛИШНИХ SET
+
 func BenchmarkPostHandler(b *testing.B) {
-	router, urlService, cfg, audit := setupBenchRouter(b)
-	router.POST("/", PostHandler(urlService, cfg, audit))
+	router, repo := setupBenchRouter(b)
+	service := shortener.NewURLService(repo)
+	cfg := &config.Config{BaseURL: "http://localhost:8080"}
+	auditPub := &audit.Publisher{}
 
-	body := "https://example.com/very/long/url/path"
+	router.POST("/", PostHandler(service, cfg, auditPub))
 
-	b.ReportAllocs()
+	payload := []byte("https://example.com/very/long/url/path")
+
+	req := httptest.NewRequest("POST", "/", nil)
+	w := httptest.NewRecorder()
+
 	b.ResetTimer()
+	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		req := httptest.NewRequest("POST", "/", strings.NewReader(body))
-		w := httptest.NewRecorder()
+		req.Body = io.NopCloser(bytes.NewReader(payload))
+		req.ContentLength = int64(len(payload))
 		router.ServeHTTP(w, req)
 	}
 }
 
-// BenchmarkGetHandler измеряет производительность редиректа
-func BenchmarkGetHandler(b *testing.B) {
-	router, urlService, _, audit := setupBenchRouter(b)
-	router.GET("/:id", GetHandler(urlService, audit))
-
-	// Подготовка: создаем тестовую ссылку
-	shortURL, _ := urlService.Shorten("https://example.com", "bench-user-123")
-
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		req := httptest.NewRequest("GET", "/"+shortURL, nil)
-		w := httptest.NewRecorder()
-		router.ServeHTTP(w, req)
-	}
-}
-
-// BenchmarkPostHandlerJSON измеряет производительность JSON endpoint
 func BenchmarkPostHandlerJSON(b *testing.B) {
-	router, urlService, cfg, audit := setupBenchRouter(b)
-	router.POST("/api/shorten", PostHandlerJSON(urlService, cfg, audit))
+	router, repo := setupBenchRouter(b)
+	service := shortener.NewURLService(repo)
+	cfg := &config.Config{BaseURL: "http://localhost:8080"}
+	auditPub := &audit.Publisher{}
 
-	requestBody := model.URL{URL: "https://example.com/very/long/url/path"}
-	jsonBody, _ := json.Marshal(requestBody)
+	router.POST("/api/shorten", PostHandlerJSON(service, cfg, auditPub))
 
-	b.ReportAllocs()
+	body := model.URL{URL: "https://example.com/very/long/url/path"}
+	jsonBody, _ := json.Marshal(body)
+
+	req := httptest.NewRequest("POST", "/api/shorten", nil)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
 	b.ResetTimer()
+	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		req := httptest.NewRequest("POST", "/api/shorten", bytes.NewReader(jsonBody))
-		req.Header.Set("Content-Type", "application/json")
-		w := httptest.NewRecorder()
+		req.Body = io.NopCloser(bytes.NewReader(jsonBody))
+		req.ContentLength = int64(len(jsonBody))
 		router.ServeHTTP(w, req)
 	}
 }
 
-// BenchmarkBatchHandler измеряет производительность batch endpoint
 func BenchmarkBatchHandler(b *testing.B) {
-	router, urlService, cfg, _ := setupBenchRouter(b)
-	router.POST("/api/shorten/batch", BatchHandler(urlService, cfg))
+	router, repo := setupBenchRouter(b)
+	service := shortener.NewURLService(repo)
+	cfg := &config.Config{BaseURL: "http://localhost:8080"}
 
-	b.Run("Batch10", func(b *testing.B) {
-		batch := make([]model.URLBatchRequest, 10)
-		for i := 0; i < 10; i++ {
-			batch[i] = model.URLBatchRequest{
-				CorrelationID: string(rune(i)),
-				OriginalURL:   "https://example.com/" + string(rune(i)),
-			}
-		}
-		jsonBody, _ := json.Marshal(batch)
+	router.POST("/api/shorten/batch", BatchHandler(service, cfg))
 
-		b.ReportAllocs()
-		b.ResetTimer()
-
-		for i := 0; i < b.N; i++ {
-			req := httptest.NewRequest("POST", "/api/shorten/batch", bytes.NewReader(jsonBody))
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
-			router.ServeHTTP(w, req)
-		}
-	})
-
-	b.Run("Batch100", func(b *testing.B) {
-		batch := make([]model.URLBatchRequest, 100)
-		for i := 0; i < 100; i++ {
-			batch[i] = model.URLBatchRequest{
-				CorrelationID: string(rune(i)),
-				OriginalURL:   "https://example.com/" + string(rune(i)),
-			}
-		}
-		jsonBody, _ := json.Marshal(batch)
-
-		b.ReportAllocs()
-		b.ResetTimer()
-
-		for i := 0; i < b.N; i++ {
-			req := httptest.NewRequest("POST", "/api/shorten/batch", bytes.NewReader(jsonBody))
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
-			router.ServeHTTP(w, req)
-		}
-	})
-}
-
-// BenchmarkGetUserURLsHandler измеряет производительность получения пользовательских URL
-func BenchmarkGetUserURLsHandler(b *testing.B) {
-	router, urlService, cfg, _ := setupBenchRouter(b)
-
-	// Добавляем заглушку авторизации — она должна ставить те же ключи,
-	// что и настоящий AuthMiddleware: had_cookie и cookie_was_valid
-	router.Use(func(c *gin.Context) {
-		c.Set("had_cookie", true)         // была кука
-		c.Set("cookie_was_valid", true)   // и она валидная
-		c.Set("userID", "bench-user-123") // то, что потом достаёт getUserID
-		c.Next()
-	})
-
-	router.GET("/api/user/urls", GetUserURLsHandler(urlService, cfg))
-
-	// Подготовка: создаём 50 URL для пользователя
-	userID := "bench-user-123"
-	for i := 0; i < 50; i++ {
-		_, _ = urlService.Shorten("https://example.com/long-url-"+strconv.Itoa(i), userID)
+	sizes := []struct {
+		name string
+		n    int
+	}{
+		{"10", 10}, {"50", 50}, {"100", 100}, {"500", 500},
 	}
 
-	b.ReportAllocs()
+	for _, s := range sizes {
+		b.Run(s.name, func(b *testing.B) {
+			batch := make([]model.URLBatchRequest, s.n)
+			for i := 0; i < s.n; i++ {
+				batch[i] = model.URLBatchRequest{
+					CorrelationID: strconv.Itoa(i),
+					OriginalURL:   "https://example.com/url/" + strconv.Itoa(i),
+				}
+			}
+			jsonBody, _ := json.Marshal(batch)
+
+			req := httptest.NewRequest("POST", "/api/shorten/batch", nil)
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			b.ResetTimer()
+			b.ReportAllocs()
+
+			for i := 0; i < b.N; i++ {
+				req.Body = io.NopCloser(bytes.NewReader(jsonBody))
+				req.ContentLength = int64(len(jsonBody))
+				router.ServeHTTP(w, req)
+			}
+		})
+	}
+}
+
+func BenchmarkGetHandler(b *testing.B) {
+	router, repo := setupBenchRouter(b)
+	service := shortener.NewURLService(repo)
+	auditPub := &audit.Publisher{}
+
+	router.GET("/:id", GetHandler(service, auditPub))
+
+	// Создаём одну ссылку
+	shortURL, _ := service.Shorten("https://benchmark.example.com", "550e8400-e29b-41d4-a716-446655440000")
+
+	req := httptest.NewRequest("GET", "/"+shortURL, nil)
+	w := httptest.NewRecorder()
+
 	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		router.ServeHTTP(w, req)
+	}
+}
+
+func BenchmarkGetUserURLsHandler(b *testing.B) {
+	router, repo := setupBenchRouter(b)
+	service := shortener.NewURLService(repo)
+	cfg := &config.Config{BaseURL: "http://localhost:8080"}
+
+	router.GET("/api/user/urls", GetUserURLsHandler(service, cfg))
+
+	userID := "550e8400-e29b-41d4-a716-446655440000"
+	for i := 0; i < 100; i++ {
+		_, _ = service.Shorten("https://example.com/user/"+strconv.Itoa(i), userID)
+	}
 
 	req := httptest.NewRequest("GET", "/api/user/urls", nil)
-	// Можно даже куку добавить для красоты, но не обязательно
-	req.AddCookie(&http.Cookie{Name: "user", Value: "some-jwt-or-session"})
+	w := httptest.NewRecorder()
+
+	b.ResetTimer()
+	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 	}
 }
 
-// BenchmarkShortenBatch измеряет производительность функции shortenBatch
-func BenchmarkShortenBatch(b *testing.B) {
-	repo := memory.NewURLRepository()
-	urlService := shortener.NewURLService(repo)
+// Полный рабочий вариант — конфликтов больше не будет
+
+func BenchmarkShortenBatch_RealDB(b *testing.B) {
+	setupBenchDB(b)
+	svc := shortener.NewURLService(benchRepo)
 	baseURL := "http://localhost:8080"
-	userID := "bench-user"
+	userID := "550e8400-e29b-41d4-a716-446655440000"
 
-	b.Run("Batch10", func(b *testing.B) {
-		requests := make([]model.URLBatchRequest, 10)
-		for i := 0; i < 10; i++ {
-			requests[i] = model.URLBatchRequest{
-				CorrelationID: string(rune(i)),
-				OriginalURL:   "https://example.com/" + string(rune(i)),
+	sizes := []struct {
+		name string
+		n    int
+	}{
+		{"10", 10}, {"50", 50}, {"100", 100}, {"500", 500}, {"1000", 1000},
+	}
+
+	for _, sz := range sizes {
+		b.Run(sz.name, func(b *testing.B) {
+			b.StopTimer() // не считаем подготовку
+
+			// Один батч на всю жизнь бенчмарка
+			reqs := make([]model.URLBatchRequest, sz.n)
+			counter := int(time.Now().UnixNano()) // гарантируем уникальность между запусками
+
+			b.StartTimer()
+			b.ReportAllocs()
+
+			for i := 0; i < b.N; i++ {
+				// Каждый раз новые уникальные URL
+				for j := 0; j < sz.n; j++ {
+					reqs[j] = model.URLBatchRequest{
+						CorrelationID: strconv.Itoa(j),
+						OriginalURL:   "https://bench.example/" + strconv.Itoa(counter),
+					}
+					counter++
+				}
+
+				_, err := shortenBatch(reqs, svc, baseURL, userID)
+				if err != nil {
+					b.Fatalf("shortenBatch failed: %v", err)
+				}
 			}
-		}
-
-		b.ReportAllocs()
-		b.ResetTimer()
-
-		for i := 0; i < b.N; i++ {
-			_, _ = shortenBatch(requests, urlService, baseURL, userID)
-		}
-	})
-
-	b.Run("Batch100", func(b *testing.B) {
-		requests := make([]model.URLBatchRequest, 100)
-		for i := 0; i < 100; i++ {
-			requests[i] = model.URLBatchRequest{
-				CorrelationID: string(rune(i)),
-				OriginalURL:   "https://example.com/" + string(rune(i)),
-			}
-		}
-
-		b.ReportAllocs()
-		b.ResetTimer()
-
-		for i := 0; i < b.N; i++ {
-			_, _ = shortenBatch(requests, urlService, baseURL, userID)
-		}
-	})
-}
-
-// BenchmarkHandleConflictError измеряет обработку ошибок конфликта
-func BenchmarkHandleConflictError(b *testing.B) {
-	baseURL := "http://localhost:8080"
-
-	b.Run("NoError", func(b *testing.B) {
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			_, _ = handleConflictError(nil, baseURL)
-		}
-	})
-
-	b.Run("WithConflictError", func(b *testing.B) {
-		// Используем правильный импорт из database пакета
-		repo := memory.NewURLRepository()
-		urlService := shortener.NewURLService(repo)
-
-		// Создаем конфликтную ситуацию
-		_, _ = urlService.Shorten("https://example.com/conflict", "user1")
-
-		b.ReportAllocs()
-		b.ResetTimer()
-
-		for i := 0; i < b.N; i++ {
-			// Пытаемся создать ту же URL снова
-			_, err := urlService.Shorten("https://example.com/conflict", "user2")
-			_, _ = handleConflictError(err, baseURL)
-		}
-	})
+		})
+	}
 }

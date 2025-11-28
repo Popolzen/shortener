@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -71,8 +70,8 @@ func main() {
 func initRepository(cfg *config.Config, dbCfg db.DBConfig) repository.URLRepository {
 	var repo repository.URLRepository
 
-	dbCfg.DBurl = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		`localhost`, 5432, `postgres`, `123456`, `shortener`)
+	// dbCfg.DBurl = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+	// 	`localhost`, 5432, `postgres`, `123456`, `shortener`)
 
 	switch {
 	case dbCfg.DBurl != "":

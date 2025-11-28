@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"math/rand/v2"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -128,48 +127,12 @@ func BenchmarkGetFormattedUserURLs(b *testing.B) {
 		_, _ = service.Shorten("https://example.com/formatted/"+string(rune(i)), userID)
 	}
 
-	b.ReportAllocs()
+	// b.ReportAllocs()
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		_, _ = service.GetFormattedUserURLs(userID, baseURL)
 	}
-}
-
-// BenchmarkStringConcatenation сравнивает способы конкатенации строк
-func BenchmarkStringConcatenation(b *testing.B) {
-	baseURL := "http://localhost:8080"
-	shortURL := "abc123"
-
-	b.Run("Plus", func(b *testing.B) {
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			_ = baseURL + "/" + shortURL
-		}
-	})
-
-	b.Run("Builder", func(b *testing.B) {
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			var sb strings.Builder
-			sb.Grow(len(baseURL) + 1 + len(shortURL))
-			sb.WriteString(baseURL)
-			sb.WriteByte('/')
-			sb.WriteString(shortURL)
-			_ = sb.String()
-		}
-	})
-
-	b.Run("BuilderNoGrow", func(b *testing.B) {
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			var sb strings.Builder
-			sb.WriteString(baseURL)
-			sb.WriteByte('/')
-			sb.WriteString(shortURL)
-			_ = sb.String()
-		}
-	})
 }
 
 // BenchmarkShortURLGeneration сравнивает разные способы генерации

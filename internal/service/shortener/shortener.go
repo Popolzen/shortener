@@ -3,11 +3,13 @@ package shortener
 import (
 	"fmt"
 	"math/rand/v2"
-	"strings"
+	"sync"
 
 	"github.com/Popolzen/shortener/internal/model"
 	"github.com/Popolzen/shortener/internal/repository"
 )
+
+const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 type URLService struct {
 	repo repository.URLRepository
@@ -68,15 +70,21 @@ func (s *URLService) DeleteURLsAsync(userID string, shortURLs []string) {
 	s.repo.DeleteURLs(userID, shortURLs)
 }
 
-// shortURL создает короткую версию URL
-func shortURL(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	var result strings.Builder
-	l := len(charset)
+var shortURLPool = sync.Pool{
+	New: func() any {
+		return new([32]byte)
+	},
+}
 
-	for range length {
-		result.WriteByte(charset[rand.IntN(l)])
+func shortURL(length int) string {
+	arr := shortURLPool.Get().(*[32]byte)
+
+	for i := 0; i < length; i++ {
+		arr[i] = charset[rand.IntN(62)]
 	}
 
-	return result.String()
+	s := string(arr[:length])
+
+	shortURLPool.Put(arr)
+	return s
 }
