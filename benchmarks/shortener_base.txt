@@ -1,0 +1,24 @@
+goos: linux
+goarch: amd64
+pkg: github.com/Popolzen/shortener/internal/service/shortener
+cpu: AMD Ryzen 5 7500F 6-Core Processor             
+BenchmarkShortURL-12                	80193890	        43.30 ns/op	       8 B/op	       1 allocs/op
+BenchmarkShorten-12                 	10631419	       425.4 ns/op	     214 B/op	       4 allocs/op
+BenchmarkGetLongURL-12              	574383577	         6.186 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGetFormattedUserURLs-12    	57554157	        62.70 ns/op	      80 B/op	       2 allocs/op
+BenchmarkStringConcatenation/Plus-12         	316141665	        11.37 ns/op	       0 B/op	       0 allocs/op
+BenchmarkStringConcatenation/Builder-12      	172485793	        20.89 ns/op	      32 B/op	       1 allocs/op
+BenchmarkStringConcatenation/BuilderNoGrow-12         	100000000	        35.29 ns/op	      72 B/op	       2 allocs/op
+BenchmarkShortURLGeneration/CurrentImplementation-12  	80388364	        43.12 ns/op	       8 B/op	       1 allocs/op
+BenchmarkShortURLGeneration/ByteSlice-12              	100000000	        31.92 ns/op	       0 B/op	       0 allocs/op
+BenchmarkIsUniq-12                                    	34872765	        99.56 ns/op	      40 B/op	       3 allocs/op
+PASS
+ok  	github.com/Popolzen/shortener/internal/service/shortener	40.623s
+
+1. **BenchmarkShortURL** - скорость генерации случайной строки
+2. **BenchmarkShorten** - полный цикл создания короткой ссылки
+3. **BenchmarkGetLongURL** - скорость получения оригинального URL
+4. **BenchmarkGetFormattedUserURLs** - форматирование списка URL пользователя
+5. **BenchmarkStringConcatenation** - сравнение способов склейки строк
+6. **BenchmarkShortURLGeneration** - сравнение алгоритмов генерации
+7. **BenchmarkIsUniq** - проверка уникальности

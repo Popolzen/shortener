@@ -1,0 +1,24 @@
+goos: linux
+goarch: amd64
+pkg: github.com/Popolzen/shortener/internal/handler
+cpu: AMD Ryzen 5 7500F 6-Core Processor             
+BenchmarkPostHandler-12            	 1434214	      2552 ns/op	    7334 B/op	      31 allocs/op
+BenchmarkGetHandler-12             	 2175320	      1645 ns/op	    6424 B/op	      20 allocs/op
+BenchmarkPostHandlerJSON-12        	 1000000	      3498 ns/op	    8226 B/op	      41 allocs/op
+BenchmarkBatchHandler/Batch10-12   	  280436	     13845 ns/op	   14858 B/op	     114 allocs/op
+BenchmarkBatchHandler/Batch100-12  	   37461	    113742 ns/op	   77507 B/op	     624 allocs/op
+BenchmarkGetUserURLsHandler-12     	 9553988	       361.8 ns/op	     624 B/op	       8 allocs/op
+BenchmarkShortenBatch/Batch10-12   	 1000000	      4414 ns/op	    2373 B/op	      41 allocs/op
+BenchmarkShortenBatch/Batch100-12  	  108800	     47715 ns/op	   23004 B/op	     401 allocs/op
+BenchmarkHandleConflictError/NoError-12         	233943615	        15.13 ns/op	      16 B/op	       1 allocs/op
+BenchmarkHandleConflictError/WithConflictError-12         	10756729	       401.7 ns/op	     180 B/op	       4 allocs/op
+PASS
+ok  	github.com/Popolzen/shortener/internal/handler	51.658s
+
+1. **BenchmarkPostHandler** - создание ссылки через POST
+2. **BenchmarkGetHandler** - редирект по короткой ссылке
+3. **BenchmarkPostHandlerJSON** - JSON endpoint
+4. **BenchmarkBatchHandler** - batch обработка (10 и 100 элементов)
+5. **BenchmarkGetUserURLsHandler** - получение всех URL пользователя
+6. **BenchmarkShortenBatch** - функция batch обработки
+7. **BenchmarkHandleConflictError** - обработка ошибок

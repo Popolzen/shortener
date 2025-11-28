@@ -1,10 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"net/http"
+	_ "net/http/pprof"
 
 	"github.com/Popolzen/shortener/internal/audit"
 	"github.com/Popolzen/shortener/internal/config"
@@ -31,6 +35,14 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	cfg := config.NewConfig()
 	dbCfg := db.NewDBConfig(*cfg)
+
+	// Запускаем pprof сервер на отдельном порту
+	go func() {
+		log.Println("pprof сервер запущен на http://localhost:6060/debug/pprof/")
+		if err := http.ListenAndServe("localhost:6060", nil); err != nil {
+			log.Printf("Ошибка запуска pprof сервера: %v", err)
+		}
+	}()
 
 	// Инициализируем паблишера
 	publisher := initAudit(cfg)
@@ -59,8 +71,8 @@ func main() {
 func initRepository(cfg *config.Config, dbCfg db.DBConfig) repository.URLRepository {
 	var repo repository.URLRepository
 
-	// dbCfg.DBurl = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-	// 	`localhost`, 5432, `postgres`, `123456`, `shortener`)
+	dbCfg.DBurl = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+		`localhost`, 5432, `postgres`, `123456`, `shortener`)
 
 	switch {
 	case dbCfg.DBurl != "":
