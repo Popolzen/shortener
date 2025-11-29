@@ -40,7 +40,7 @@ func setupInMemoryRouter() (*gin.Engine, *memory.URLRepository) {
 // БЕНЧМАРКИ С IN-MEMORY РЕПОЗИТОРИЕМ
 // =============================================================================
 
-func BenchmarkPostHandler_InMemory(b *testing.B) {
+func BenchmarkPostHandlerInMemory(b *testing.B) {
 	router, repo := setupInMemoryRouter()
 	service := shortener.NewURLService(repo)
 	cfg := &config.Config{BaseURL: "http://localhost:8080"}
@@ -63,7 +63,7 @@ func BenchmarkPostHandler_InMemory(b *testing.B) {
 	}
 }
 
-func BenchmarkPostHandlerJSON_InMemory(b *testing.B) {
+func BenchmarkPostHandlerJSONInMemory(b *testing.B) {
 	router, repo := setupInMemoryRouter()
 	service := shortener.NewURLService(repo)
 	cfg := &config.Config{BaseURL: "http://localhost:8080"}
@@ -89,7 +89,7 @@ func BenchmarkPostHandlerJSON_InMemory(b *testing.B) {
 	}
 }
 
-func BenchmarkGetHandler_InMemory(b *testing.B) {
+func BenchmarkGetHandlerInMemory(b *testing.B) {
 	router, repo := setupInMemoryRouter()
 	service := shortener.NewURLService(repo)
 	auditPub := &audit.Publisher{}
@@ -111,7 +111,7 @@ func BenchmarkGetHandler_InMemory(b *testing.B) {
 	}
 }
 
-func BenchmarkBatchHandler_InMemory(b *testing.B) {
+func BenchmarkBatchHandlerInMemory(b *testing.B) {
 	router, repo := setupInMemoryRouter()
 	service := shortener.NewURLService(repo)
 	cfg := &config.Config{BaseURL: "http://localhost:8080"}
@@ -148,7 +148,7 @@ func BenchmarkBatchHandler_InMemory(b *testing.B) {
 	}
 }
 
-func BenchmarkGetUserURLsHandler_InMemory(b *testing.B) {
+func BenchmarkGetUserURLsHandlerInMemory(b *testing.B) {
 	router, repo := setupInMemoryRouter()
 	service := shortener.NewURLService(repo)
 	cfg := &config.Config{BaseURL: "http://localhost:8080"}
@@ -173,7 +173,7 @@ func BenchmarkGetUserURLsHandler_InMemory(b *testing.B) {
 	}
 }
 
-func BenchmarkShortenBatch_InMemory(b *testing.B) {
+func BenchmarkShortenBatchInMemory(b *testing.B) {
 	repo := memory.NewURLRepository()
 	service := shortener.NewURLService(repo)
 	baseURL := "http://localhost:8080"
@@ -206,7 +206,7 @@ func BenchmarkShortenBatch_InMemory(b *testing.B) {
 	}
 }
 
-func BenchmarkHandleConflictError_InMemory(b *testing.B) {
+func BenchmarkHandleConflictErrorInMemory(b *testing.B) {
 	baseURL := "http://localhost:8080"
 
 	b.Run("NoError", func(b *testing.B) {

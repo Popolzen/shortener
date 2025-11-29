@@ -6,8 +6,8 @@ import (
 	"github.com/Popolzen/shortener/internal/repository/memory"
 )
 
-// BenchmarkShorten_InMemory — полный цикл сокращения
-func BenchmarkShorten_InMemory(b *testing.B) {
+// BenchmarkShortenInMemory — полный цикл сокращения
+func BenchmarkShortenInMemory(b *testing.B) {
 	repo := memory.NewURLRepository()
 	service := NewURLService(repo)
 	userID := "test-user-123"
@@ -21,8 +21,8 @@ func BenchmarkShorten_InMemory(b *testing.B) {
 	}
 }
 
-// BenchmarkGetLongURL_InMemory — получение длинного URL
-func BenchmarkGetLongURL_InMemory(b *testing.B) {
+// BenchmarkGetLongURLInMemory — получение длинного URL
+func BenchmarkGetLongURLInMemory(b *testing.B) {
 	repo := memory.NewURLRepository()
 	service := NewURLService(repo)
 	userID := "test-user-123"
@@ -37,8 +37,8 @@ func BenchmarkGetLongURL_InMemory(b *testing.B) {
 	}
 }
 
-// BenchmarkIsUniq_InMemory — проверка уникальности
-func BenchmarkIsUniq_InMemory(b *testing.B) {
+// BenchmarkIsUniqInMemory — проверка уникальности
+func BenchmarkIsUniqInMemory(b *testing.B) {
 	repo := memory.NewURLRepository()
 	service := NewURLService(repo)
 	userID := "test-user-123"
