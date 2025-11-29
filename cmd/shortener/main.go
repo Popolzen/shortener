@@ -6,6 +6,9 @@ import (
 	"os/signal"
 	"syscall"
 
+	"net/http"
+	_ "net/http/pprof"
+
 	"github.com/Popolzen/shortener/internal/audit"
 	"github.com/Popolzen/shortener/internal/config"
 	"github.com/Popolzen/shortener/internal/db"
@@ -31,6 +34,14 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	cfg := config.NewConfig()
 	dbCfg := db.NewDBConfig(*cfg)
+
+	// Запускаем pprof сервер на отдельном порту
+	go func() {
+		log.Println("pprof сервер запущен на http://localhost:6060/debug/pprof/")
+		if err := http.ListenAndServe("localhost:6060", nil); err != nil {
+			log.Printf("Ошибка запуска pprof сервера: %v", err)
+		}
+	}()
 
 	// Инициализируем паблишера
 	publisher := initAudit(cfg)

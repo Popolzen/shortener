@@ -101,7 +101,7 @@ func (r *URLRepository) GetUserURLs(userID string) ([]model.URLPair, error) {
 	if err != nil {
 		return nil, fmt.Errorf("ошибка при получении URL пользователя: %w", err)
 	}
-	// defer rows.Close()
+	defer rows.Close()
 
 	var urls []model.URLPair
 	for rows.Next() {

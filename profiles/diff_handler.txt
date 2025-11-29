@@ -1,0 +1,89 @@
+go tool pprof -top -diff_base=profiles/base_handler.pprof profiles/result_handler.pprof 
+File: handler.test
+Build ID: 9b13b0af2fae21966b83cce65f909324e6541cd6
+Type: alloc_space
+Time: 2025-11-28 11:59:30 MSK
+Showing nodes accounting for -34880.39MB, 98.24% of 35506.02MB total
+Dropped 183 nodes (cum <= 177.53MB)
+      flat  flat%   sum%        cum   cum%
+-22305.89MB 62.82% 62.82% -22305.89MB 62.82%  github.com/gin-gonic/gin.(*Context).Set
+-4777.41MB 13.46% 76.28% -4777.41MB 13.46%  bytes.growSlice
+-3162.76MB  8.91% 85.19% -3162.76MB  8.91%  encoding/json.(*Decoder).refill
+-1136.06MB  3.20% 88.39% -1136.06MB  3.20%  reflect.growslice
+ -670.48MB  1.89% 90.27% -1126.49MB  3.17%  github.com/Popolzen/shortener/internal/repository/database.(*URLRepository).GetUserURLs
+ -569.03MB  1.60% 91.88%  -572.05MB  1.61%  encoding/json.Marshal
+ -531.52MB  1.50% 93.37%  -531.52MB  1.50%  encoding/json.(*decodeState).literalStore
+ -498.65MB  1.40% 94.78% -1336.25MB  3.76%  github.com/Popolzen/shortener/internal/handler.shortenBatch
+ -231.51MB  0.65% 95.43%  -231.51MB  0.65%  github.com/jackc/pgx/v5/pgtype.scanPlanString.Scan
+ -206.06MB  0.58% 96.01%  -206.06MB  0.58%  github.com/jackc/pgx/v5.(*Conn).getRows
+ -185.50MB  0.52% 96.53%  -417.01MB  1.17%  github.com/jackc/pgx/v5/stdlib.(*Rows).Next.func14
+ -177.51MB   0.5% 97.03% -1303.99MB  3.67%  github.com/Popolzen/shortener/internal/service/shortener.URLService.GetFormattedUserURLs
+ -109.02MB  0.31% 97.34%  -445.08MB  1.25%  database/sql.(*DB).queryDC
+  -79.01MB  0.22% 97.56%  -304.06MB  0.86%  github.com/jackc/pgx/v5/stdlib.(*Conn).QueryContext
+  -73.50MB  0.21% 97.77%  -490.51MB  1.38%  github.com/jackc/pgx/v5/stdlib.(*Rows).Next
+     -39MB  0.11% 97.88%  -578.07MB  1.63%  github.com/Popolzen/shortener/internal/repository/database.(*URLRepository).Store
+     -32MB  0.09% 97.97%  -295.03MB  0.83%  github.com/jackc/pgx/v5/stdlib.(*Conn).ExecContext
+     -22MB 0.062% 98.03%  -539.51MB  1.52%  database/sql.(*Rows).nextLocked
+     -16MB 0.045% 98.08%  -480.16MB  1.35%  github.com/Popolzen/shortener/internal/handler.BenchmarkShortenBatch_RealDB.func1
+  -15.50MB 0.044% 98.12%  -444.58MB  1.25%  database/sql.(*DB).QueryRowContext (inline)
+  -13.50MB 0.038% 98.16%  -471.07MB  1.33%  github.com/Popolzen/shortener/internal/repository/database.(*URLRepository).Get
+      -9MB 0.025% 98.18%  -391.05MB  1.10%  database/sql.(*DB).execDC
+   -8.50MB 0.024% 98.21%  -453.58MB  1.28%  database/sql.(*DB).query
+      -6MB 0.017% 98.22%  -537.52MB  1.51%  encoding/json.(*decodeState).object
+      -4MB 0.011% 98.24% -5785.38MB 16.29%  github.com/Popolzen/shortener/internal/handler.BenchmarkBatchHandler.BatchHandler.func2
+   -0.50MB 0.0014% 98.24% -3477.82MB  9.80%  github.com/Popolzen/shortener/internal/handler.BenchmarkGetUserURLsHandler.GetUserURLsHandler.func1
+   -0.50MB 0.0014% 98.24% -2179.58MB  6.14%  github.com/gin-gonic/gin.(*Context).JSON
+         0     0% 98.24% -4775.89MB 13.45%  bytes.(*Buffer).Write
+         0     0% 98.24% -4777.41MB 13.46%  bytes.(*Buffer).grow
+         0     0% 98.24%  -392.05MB  1.10%  database/sql.(*DB).Exec (inline)
+         0     0% 98.24%  -392.05MB  1.10%  database/sql.(*DB).ExecContext
+         0     0% 98.24%  -392.05MB  1.10%  database/sql.(*DB).ExecContext.func1
+         0     0% 98.24%  -453.58MB  1.28%  database/sql.(*DB).QueryContext
+         0     0% 98.24%  -453.58MB  1.28%  database/sql.(*DB).QueryContext.func1
+         0     0% 98.24%  -444.58MB  1.25%  database/sql.(*DB).QueryRow
+         0     0% 98.24%  -392.05MB  1.10%  database/sql.(*DB).exec
+         0     0% 98.24%  -382.05MB  1.08%  database/sql.(*DB).execDC.func2
+         0     0% 98.24%  -336.06MB  0.95%  database/sql.(*DB).queryDC.func1
+         0     0% 98.24%  -845.63MB  2.38%  database/sql.(*DB).retry
+         0     0% 98.24%  -546.51MB  1.54%  database/sql.(*Rows).Next
+         0     0% 98.24%  -539.51MB  1.52%  database/sql.(*Rows).Next.func1
+         0     0% 98.24%  -295.03MB  0.83%  database/sql.ctxDriverExec
+         0     0% 98.24%  -304.06MB  0.86%  database/sql.ctxDriverQuery
+         0     0% 98.24% -1259.62MB  3.55%  database/sql.withLock
+         0     0% 98.24% -4843.84MB 13.64%  encoding/json.(*Decoder).Decode
+         0     0% 98.24% -3165.76MB  8.92%  encoding/json.(*Decoder).readValue
+         0     0% 98.24% -1670.58MB  4.71%  encoding/json.(*decodeState).array
+         0     0% 98.24% -1678.08MB  4.73%  encoding/json.(*decodeState).unmarshal
+         0     0% 98.24% -1674.58MB  4.72%  encoding/json.(*decodeState).value
+         0     0% 98.24% -5840.43MB 16.45%  github.com/Popolzen/shortener/internal/handler.BenchmarkBatchHandler.func1
+         0     0% 98.24% -25368.39MB 71.45%  github.com/Popolzen/shortener/internal/handler.BenchmarkGetHandler
+         0     0% 98.24% -3496.83MB  9.85%  github.com/Popolzen/shortener/internal/handler.BenchmarkGetUserURLsHandler
+         0     0% 98.24% -31854.77MB 89.72%  github.com/Popolzen/shortener/internal/handler.setupBenchRouter.func1
+         0     0% 98.24% -1126.49MB  3.17%  github.com/Popolzen/shortener/internal/service/shortener.(*URLService).GetUserURLs (inline)
+         0     0% 98.24% -1053.13MB  2.97%  github.com/Popolzen/shortener/internal/service/shortener.URLService.Shorten
+         0     0% 98.24%  -471.07MB  1.33%  github.com/Popolzen/shortener/internal/service/shortener.URLService.isUniq (inline)
+         0     0% 98.24% -31854.77MB 89.72%  github.com/gin-gonic/gin.(*Context).Next (inline)
+         0     0% 98.24% -2209.89MB  6.22%  github.com/gin-gonic/gin.(*Context).Render
+         0     0% 98.24% -34998.30MB 98.57%  github.com/gin-gonic/gin.(*Engine).ServeHTTP
+         0     0% 98.24% -34992.29MB 98.55%  github.com/gin-gonic/gin.(*Engine).handleHTTPRequest
+         0     0% 98.24% -4776.39MB 13.45%  github.com/gin-gonic/gin.(*responseWriter).Write
+         0     0% 98.24% -25368.39MB 71.45%  github.com/gin-gonic/gin.serveError
+         0     0% 98.24% -2179.08MB  6.14%  github.com/gin-gonic/gin/render.JSON.Render
+         0     0% 98.24% -2179.08MB  6.14%  github.com/gin-gonic/gin/render.WriteJSON
+         0     0% 98.24%  -259.53MB  0.73%  github.com/jackc/pgx/v5.(*Conn).Exec
+         0     0% 98.24%  -218.06MB  0.61%  github.com/jackc/pgx/v5.(*Conn).Query
+         0     0% 98.24%  -259.53MB  0.73%  github.com/jackc/pgx/v5.(*Conn).exec
+         0     0% 98.24%  -259.53MB  0.73%  github.com/jackc/pgx/v5.(*Conn).execPrepared
+         0     0% 98.24%  -218.03MB  0.61%  github.com/jackc/pgx/v5/pgconn.(*PgConn).ExecPrepared
+         0     0% 98.24%  -218.03MB  0.61%  github.com/jackc/pgx/v5/pgconn.(*PgConn).execExtendedSuffix
+         0     0% 98.24%  -218.03MB  0.61%  github.com/jackc/pgx/v5/pgconn.(*ResultReader).readUntilRowDescription
+         0     0% 98.24% -4775.89MB 13.45%  net/http/httptest.(*ResponseRecorder).Write
+         0     0% 98.24% -1136.06MB  3.20%  reflect.Value.Grow
+         0     0% 98.24% -1136.06MB  3.20%  reflect.Value.grow
+         0     0% 98.24% -35486.47MB 99.94%  testing.(*B).launch
+         0     0% 98.24%   -35493MB   100%  testing.(*B).runN
+
+
+
+
+(Убрал аллокацию строк кодга для middleware мы через контекст джина передает user_id и что куки хорошие) :)

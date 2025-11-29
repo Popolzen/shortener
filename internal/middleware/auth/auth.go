@@ -11,6 +11,12 @@ import (
 	"github.com/google/uuid"
 )
 
+type ctxKey string
+
+const UserIDKey ctxKey = "user_id"
+const CookieValidKey ctxKey = "cookie_was_valid"
+const HadCookieKey ctxKey = "had_cookie"
+
 // validateCookie валидирует подписанную куки и возвращает userID, если валидна.
 func validateCookie(cookieValue string, cfg *config.Config) (string, bool) {
 	parts := strings.Split(cookieValue, ".")
@@ -75,9 +81,9 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 		userID, isValid, hadCookie := getOrCreateUserID(c, cfg)
 		setSignedCookie(c, userID, cfg)
 
-		c.Set("user_id", userID)
-		c.Set("cookie_was_valid", isValid)
-		c.Set("had_cookie", hadCookie)
+		c.Set(string(UserIDKey), userID)
+		c.Set(string(CookieValidKey), isValid)
+		c.Set(string(HadCookieKey), hadCookie)
 
 		c.Next()
 	}
