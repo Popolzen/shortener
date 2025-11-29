@@ -3,7 +3,6 @@ package shortener
 import (
 	"context"
 	"database/sql"
-	"math/rand/v2"
 	"sync"
 	"testing"
 	"time"
@@ -133,28 +132,6 @@ func BenchmarkGetFormattedUserURLs(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_, _ = service.GetFormattedUserURLs(userID, baseURL)
 	}
-}
-
-// BenchmarkShortURLGeneration сравнивает разные способы генерации
-func BenchmarkShortURLGeneration(b *testing.B) {
-	b.Run("CurrentImplementation", func(b *testing.B) {
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			_ = shortURL(6)
-		}
-	})
-
-	b.Run("ByteSlice", func(b *testing.B) {
-		const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			result := make([]byte, 6)
-			for j := range 6 {
-				result[j] = charset[rand.IntN(len(charset))]
-			}
-			_ = string(result)
-		}
-	})
 }
 
 // BenchmarkIsUniq измеряет производительность проверки уникальности

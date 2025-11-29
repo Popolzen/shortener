@@ -11,6 +11,7 @@ package shortener
 import (
 	"fmt"
 	"math/rand/v2"
+	"strings"
 	"sync"
 
 	"github.com/Popolzen/shortener/internal/model"
@@ -171,9 +172,9 @@ func (s *URLService) DeleteURLsAsync(userID string, shortURLs []string) {
 	s.repo.DeleteURLs(userID, shortURLs)
 }
 
-var shortURLPool = sync.Pool{
+var builderPool = sync.Pool{
 	New: func() any {
-		return new([32]byte)
+		return &strings.Builder{}
 	},
 }
 
@@ -187,14 +188,20 @@ var shortURLPool = sync.Pool{
 // Возвращает:
 //   - string: случайный идентификатор
 func shortURL(length int) string {
-	arr := shortURLPool.Get().(*[32]byte)
+	// Берём Builder из пула
+	b := builderPool.Get().(*strings.Builder)
+	defer func() {
+		b.Reset()
+		builderPool.Put(b)
+	}()
 
+	// Выделяем память заранее
+	b.Grow(length)
+
+	// Заполняем
 	for i := 0; i < length; i++ {
-		arr[i] = charset[rand.IntN(62)]
+		b.WriteByte(charset[rand.IntN(62)])
 	}
 
-	s := string(arr[:length])
-
-	shortURLPool.Put(arr)
-	return s
+	return b.String()
 }

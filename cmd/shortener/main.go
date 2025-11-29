@@ -35,13 +35,15 @@ func main() {
 	cfg := config.NewConfig()
 	dbCfg := db.NewDBConfig(*cfg)
 
-	// Запускаем pprof сервер на отдельном порту
-	go func() {
-		log.Println("pprof сервер запущен на http://localhost:6060/debug/pprof/")
-		if err := http.ListenAndServe("localhost:6060", nil); err != nil {
-			log.Printf("Ошибка запуска pprof сервера: %v", err)
-		}
-	}()
+	// Запускаем pprof сервер на настраиваемом порту
+	if cfg.PprofAddr != "" {
+		go func() {
+			log.Printf("pprof сервер запущен на http://%s/debug/pprof/", cfg.PprofAddr)
+			if err := http.ListenAndServe(cfg.PprofAddr, nil); err != nil {
+				log.Printf("Ошибка запуска pprof сервера: %v", err)
+			}
+		}()
+	}
 
 	// Инициализируем паблишера
 	publisher := initAudit(cfg)

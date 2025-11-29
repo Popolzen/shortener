@@ -12,6 +12,7 @@ const (
 	DefaultBaseURL       = "http://localhost:8080"
 	DefaultFilePath      = "storage.json"
 	DefaultAuditFilePath = "audit_storage.json"
+	DefaultPprofAddr     = "localhost:6060"
 )
 
 type Config struct {
@@ -22,6 +23,7 @@ type Config struct {
 	SecretKey  string `env:"KEY"`
 	AuditFile  string `env:"AUDIT_FILE"`
 	AuditURL   string `env:"AUDIT_URL"`
+	PprofAddr  string `env:"PPROF_ADDRESS"`
 }
 
 func (c *Config) getArgsFromCli() {
@@ -32,6 +34,7 @@ func (c *Config) getArgsFromCli() {
 	flag.StringVar(&c.SecretKey, "k", "", "secret key")
 	flag.StringVar(&c.AuditFile, "audit-file", DefaultAuditFilePath, "audit file path")
 	flag.StringVar(&c.AuditURL, "audit-url", "", "audit server URL")
+	flag.StringVar(&c.PprofAddr, "pprof", DefaultPprofAddr, "pprof server address")
 	flag.Parse()
 }
 
@@ -46,6 +49,7 @@ func NewConfig() *Config {
 		ServerAddr: DefaultServerAddr,
 		BaseURL:    DefaultBaseURL,
 		FilePath:   DefaultFilePath,
+		PprofAddr:  DefaultPprofAddr,
 	}
 	c.getArgsFromCli()
 	c.getArgsFromEnv()
@@ -64,6 +68,7 @@ func (c Config) GetBaseURL() string {
 func (c Config) GetFilePath() string {
 	return c.FilePath
 }
+
 func (c Config) GetAuditFile() string {
 	return c.AuditFile
 }
