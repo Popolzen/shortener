@@ -86,13 +86,10 @@ func setupBenchRouter(b *testing.B) (*gin.Engine, *database.URLRepository) {
 	setupBenchDB(b)
 	router := gin.New()
 
-	// ВАЖНО: в бенчмарках НЕ используем мидлварь с c.Set — она убивает профиль!
-	// Вместо этого подсовываем user_id через заголовок или напрямую в контекст один раз
 	userID := "550e8400-e29b-41d4-a716-446655440000"
 
 	router.Use(func(c *gin.Context) {
-		// Делаем c.Set ТОЛЬКО ОДИН РАЗ на роутер, а не на каждый запрос
-		// Но лучше — вообще не делать. Вместо этого:
+
 		c.Set("user_id", userID)
 		c.Set("had_cookie", true)
 		c.Set("cookie_was_valid", true)
@@ -101,9 +98,6 @@ func setupBenchRouter(b *testing.B) (*gin.Engine, *database.URLRepository) {
 
 	return router, benchRepo
 }
-
-// =============================================================================
-// ВСЕ БЕНЧМАРКИ — ТОЛЬКО С POSTGRES, НИКАКОГО MEMORY REPO, НИКАКИХ ЛИШНИХ SET
 
 func BenchmarkPostHandler(b *testing.B) {
 	router, repo := setupBenchRouter(b)
