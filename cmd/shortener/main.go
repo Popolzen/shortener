@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -24,7 +25,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
 func main() {
+	printBuildInfo()
+
 	// Инициализируем логгер
 	if err := logger.Init(); err != nil {
 		log.Fatal("Не удалось инициализировать логгер:", err)
@@ -66,6 +75,26 @@ func main() {
 
 	// Graceful Shutdown
 	setupGracefulShutdown(repo)
+}
+
+func printBuildInfo() {
+	version := "N/A"
+	date := "N/A"
+	commit := "N/A"
+
+	if buildVersion != "" {
+		version = buildVersion
+	}
+	if buildDate != "" {
+		date = buildDate
+	}
+	if buildCommit != "" {
+		commit = buildCommit
+	}
+
+	fmt.Printf("Build version: %s\n", version)
+	fmt.Printf("Build date: %s\n", date)
+	fmt.Printf("Build commit: %s\n", commit)
 }
 
 // initRepository инициализирует репозиторий в зависимости от конфигурации
