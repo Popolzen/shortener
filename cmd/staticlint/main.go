@@ -116,6 +116,14 @@ import (
 	"honnef.co/go/tools/staticcheck"
 )
 
+const (
+	packageMain  = "main"
+	funcMain     = "main"
+	osPackage    = "os"
+	exitFunc     = "Exit"
+	errorMessage = "использование os.Exit в функции main запрещено"
+)
+
 // noOsExitAnalyzer — собственный анализатор, запрещающий os.Exit в main.
 //
 // Анализатор проверяет, что функция main пакета main не содержит
@@ -131,8 +139,7 @@ var noOsExitAnalyzer = &analysis.Analyzer{
 
 // runNoOsExit выполняет проверку на наличие os.Exit в main.
 func runNoOsExit(pass *analysis.Pass) (interface{}, error) {
-	// Проверяем только пакет main
-	if pass.Pkg.Name() != "main" {
+	if pass.Pkg.Name() != packageMain {
 		return nil, nil
 	}
 
@@ -140,7 +147,7 @@ func runNoOsExit(pass *analysis.Pass) (interface{}, error) {
 		ast.Inspect(file, func(n ast.Node) bool {
 			// Ищем функцию main
 			fn, ok := n.(*ast.FuncDecl)
-			if !ok || fn.Name.Name != "main" {
+			if !ok || fn.Name.Name != funcMain {
 				return true
 			}
 
@@ -154,7 +161,7 @@ func runNoOsExit(pass *analysis.Pass) (interface{}, error) {
 				checkStatement(stmt, pass, false)
 			}
 
-			return false // не идём глубже в AST
+			return false
 		})
 	}
 
@@ -165,56 +172,86 @@ func runNoOsExit(pass *analysis.Pass) (interface{}, error) {
 func checkStatement(stmt ast.Stmt, pass *analysis.Pass, inFunc bool) {
 	switch s := stmt.(type) {
 	case *ast.ExprStmt:
-		if call, ok := s.X.(*ast.CallExpr); ok {
-			checkOsExit(call, pass)
-		}
+		checkExprStmt(s, pass)
 	case *ast.AssignStmt:
-		for _, expr := range s.Rhs {
-			if call, ok := expr.(*ast.CallExpr); ok {
-				checkOsExit(call, pass)
-			}
-		}
+		checkAssignStmt(s, pass)
 	case *ast.IfStmt:
-		if s.Body != nil {
-			for _, stmt := range s.Body.List {
-				checkStatement(stmt, pass, inFunc)
-			}
-		}
-		if s.Else != nil {
-			checkStatement(s.Else, pass, inFunc)
-		}
+		checkIfStmt(s, pass, inFunc)
 	case *ast.BlockStmt:
-		for _, stmt := range s.List {
-			checkStatement(stmt, pass, inFunc)
-		}
+		checkBlockStmt(s, pass, inFunc)
 	case *ast.ForStmt:
-		if s.Body != nil {
-			for _, stmt := range s.Body.List {
-				checkStatement(stmt, pass, inFunc)
-			}
-		}
+		checkForStmt(s, pass, inFunc)
 	case *ast.RangeStmt:
-		if s.Body != nil {
-			for _, stmt := range s.Body.List {
-				checkStatement(stmt, pass, inFunc)
-			}
-		}
+		checkRangeStmt(s, pass, inFunc)
 	case *ast.SwitchStmt:
-		if s.Body != nil {
-			for _, stmt := range s.Body.List {
-				checkStatement(stmt, pass, inFunc)
-			}
-		}
+		checkSwitchStmt(s, pass, inFunc)
 	case *ast.CaseClause:
-		for _, stmt := range s.Body {
-			checkStatement(stmt, pass, inFunc)
-		}
+		checkCaseClause(s, pass, inFunc)
 	case *ast.GoStmt:
-		// НЕ проверяем goroutine - это не прямой вызов в main
 		return
 	case *ast.DeferStmt:
-		// НЕ проверяем defer
 		return
+	}
+}
+
+func checkExprStmt(s *ast.ExprStmt, pass *analysis.Pass) {
+	if call, ok := s.X.(*ast.CallExpr); ok {
+		checkOsExit(call, pass)
+	}
+}
+
+func checkAssignStmt(s *ast.AssignStmt, pass *analysis.Pass) {
+	for _, expr := range s.Rhs {
+		if call, ok := expr.(*ast.CallExpr); ok {
+			checkOsExit(call, pass)
+		}
+	}
+}
+
+func checkIfStmt(s *ast.IfStmt, pass *analysis.Pass, inFunc bool) {
+	if s.Body != nil {
+		for _, stmt := range s.Body.List {
+			checkStatement(stmt, pass, inFunc)
+		}
+	}
+	if s.Else != nil {
+		checkStatement(s.Else, pass, inFunc)
+	}
+}
+
+func checkBlockStmt(s *ast.BlockStmt, pass *analysis.Pass, inFunc bool) {
+	for _, stmt := range s.List {
+		checkStatement(stmt, pass, inFunc)
+	}
+}
+
+func checkForStmt(s *ast.ForStmt, pass *analysis.Pass, inFunc bool) {
+	if s.Body != nil {
+		for _, stmt := range s.Body.List {
+			checkStatement(stmt, pass, inFunc)
+		}
+	}
+}
+
+func checkRangeStmt(s *ast.RangeStmt, pass *analysis.Pass, inFunc bool) {
+	if s.Body != nil {
+		for _, stmt := range s.Body.List {
+			checkStatement(stmt, pass, inFunc)
+		}
+	}
+}
+
+func checkSwitchStmt(s *ast.SwitchStmt, pass *analysis.Pass, inFunc bool) {
+	if s.Body != nil {
+		for _, stmt := range s.Body.List {
+			checkStatement(stmt, pass, inFunc)
+		}
+	}
+}
+
+func checkCaseClause(s *ast.CaseClause, pass *analysis.Pass, inFunc bool) {
+	for _, stmt := range s.Body {
+		checkStatement(stmt, pass, inFunc)
 	}
 }
 
@@ -230,9 +267,8 @@ func checkOsExit(call *ast.CallExpr, pass *analysis.Pass) {
 		return
 	}
 
-	if ident.Name == "os" && sel.Sel.Name == "Exit" {
-		pass.Reportf(call.Pos(),
-			"использование os.Exit в функции main запрещено")
+	if ident.Name == osPackage && sel.Sel.Name == exitFunc {
+		pass.Reportf(call.Pos(), errorMessage)
 	}
 }
 
