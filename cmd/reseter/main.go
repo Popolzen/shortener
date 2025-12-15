@@ -48,9 +48,15 @@ func main() {
 			}
 
 			for _, spec := range genDecl.Specs {
-				typeSpec := spec.(*ast.TypeSpec)
+				typeSpec, ok := spec.(*ast.TypeSpec)
+				if !ok {
+					continue
+				}
 				structType, ok := typeSpec.Type.(*ast.StructType)
 				if !ok {
+					continue
+				}
+				if structType.Fields == nil {
 					continue
 				}
 
@@ -107,7 +113,10 @@ func parseType(expr ast.Expr) (string, bool, bool, bool) {
 	case *ast.Ident:
 		return t.Name, false, false, false
 	case *ast.SelectorExpr:
-		return fmt.Sprintf("%s.%s", t.X, t.Sel), false, false, false
+		if xIdent, ok := t.X.(*ast.Ident); ok {
+			return fmt.Sprintf("%s.%s", xIdent.Name, t.Sel.Name), false, false, false
+		}
+		return "", false, false, false
 	}
 	return "", false, false, false
 }
