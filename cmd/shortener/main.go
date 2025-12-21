@@ -68,9 +68,17 @@ func main() {
 
 	// Запускаем сервер
 	addr := cfg.GetAddress()
-	log.Printf("URL Shortener запущен на http://%s", addr)
-	if err := r.Run(addr); err != nil {
-		log.Fatal("Не удалось запустить сервер:", err)
+
+	if cfg.EnableHTTPS {
+		log.Printf("URL Shortener запущен на https://%s (HTTPS)", addr)
+		if err := r.RunTLS(addr, cfg.CertFile, cfg.KeyFile); err != nil {
+			log.Fatal("Не удалось запустить HTTPS сервер:", err)
+		}
+	} else {
+		log.Printf("URL Shortener запущен на http://%s", addr)
+		if err := r.Run(addr); err != nil {
+			log.Fatal("Не удалось запустить сервер:", err)
+		}
 	}
 
 	// Graceful Shutdown
@@ -185,5 +193,6 @@ func setupRouter(shortener shortener.URLService, cfg *config.Config, dbCfg db.DB
 	r.DELETE("/api/user/urls", handler.DeleteURLsHandler(shortener))
 
 	r.GET("/ping", handler.PingHandler(dbCfg))
+
 	return r
 }
