@@ -44,3 +44,7 @@ func (r *URLRepository) GetUserURLs(userID string) ([]model.URLPair, error) {
 func (r *URLRepository) DeleteURLs(userID string, urlIDs []string) {
 	fmt.Print("DeteleUrls not implemented for in-memory storage")
 }
+
+func (r *URLRepository) Close() error {
+	return nil
+}

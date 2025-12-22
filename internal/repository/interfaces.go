@@ -83,4 +83,6 @@ type URLRepository interface {
 	// Пример:
 	//   repo.DeleteURLs("user123", []string{"abc123", "def456"})
 	DeleteURLs(userID string, urlIDs []string)
+
+	Close() error
 }

@@ -45,7 +45,7 @@ func main() {
 	cfg := config.NewConfig()
 	dbCfg := db.NewDBConfig(*cfg)
 
-	// Запускаем pprof сервер на настраиваемом порту
+	// Pprof сервер
 	if cfg.PprofAddr != "" {
 		go func() {
 			log.Printf("pprof сервер запущен на http://%s/debug/pprof/", cfg.PprofAddr)
@@ -55,18 +55,15 @@ func main() {
 		}()
 	}
 
-	// Инициализируем паблишера
-	publisher := initAudit(cfg)
+	app := &App{
+		publisher: initAudit(cfg),
+		repo:      initRepository(cfg, dbCfg),
+	}
 
-	// Инициализируем репозиторий
-	repo := initRepository(cfg, dbCfg)
+	shortener := shortener.NewURLService(app.repo)
+	r := setupRouter(shortener, cfg, dbCfg, app.publisher)
 
-	// Создаем сервис
-	shortener := shortener.NewURLService(repo)
-	r := setupRouter(shortener, cfg, dbCfg, publisher)
-
-	// HTTP/HTTPS сервер с graceful shutdown
-	srv := &http.Server{
+	app.server = &http.Server{
 		Addr:    cfg.GetAddress(),
 		Handler: r,
 	}
@@ -76,10 +73,10 @@ func main() {
 		var err error
 		if cfg.EnableHTTPS {
 			log.Printf("URL Shortener запущен на https://%s (HTTPS)", cfg.GetAddress())
-			err = srv.ListenAndServeTLS(cfg.CertFile, cfg.KeyFile)
+			err = app.server.ListenAndServeTLS(cfg.CertFile, cfg.KeyFile)
 		} else {
 			log.Printf("URL Shortener запущен на http://%s", cfg.GetAddress())
-			err = srv.ListenAndServe()
+			err = app.server.ListenAndServe()
 		}
 
 		if err != nil && err != http.ErrServerClosed {
@@ -87,14 +84,11 @@ func main() {
 		}
 	}()
 
-	// Graceful Shutdown
-	gracefulShutdown(srv, repo, publisher)
+	gracefulShutdown(app)
 }
 
-// gracefulShutdown обрабатывает сигналы завершения
-func gracefulShutdown(srv *http.Server, repo repository.URLRepository, pub *audit.Publisher) {
+func gracefulShutdown(app *App) {
 	quit := make(chan os.Signal, 1)
-	// Обрабатываем SIGINT, SIGTERM, SIGQUIT
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	sig := <-quit
@@ -104,47 +98,13 @@ func gracefulShutdown(srv *http.Server, repo repository.URLRepository, pub *audi
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Останавливаем HTTP сервер (ждём завершения активных запросов)
-	log.Println("Останавливаем HTTP сервер...")
-	if err := srv.Shutdown(ctx); err != nil {
-		log.Printf("Ошибка при остановке сервера: %v", err)
+	if err := app.Shutdown(ctx); err != nil {
+		log.Printf("Ошибка при shutdown: %v", err)
 	}
-
-	// Закрываем репозиторий
-	log.Println("Закрываем репозиторий...")
-	closeRepository(repo)
-
-	// Закрываем audit publisher
-	log.Println("Закрываем audit publisher...")
-	if err := pub.Close(); err != nil {
-		log.Printf("Ошибка закрытия publisher: %v", err)
+	if err := app.Close(); err != nil {
+		log.Printf("Ошибка при закрытии репозитория и аудита: %v", err)
 	}
-
 	log.Println("Сервис успешно остановлен")
-}
-
-// closeRepository закрывает репозиторий в зависимости от типа
-func closeRepository(repo repository.URLRepository) {
-	switch r := repo.(type) {
-	case *database.URLRepository:
-		// Закрываем канал удаления и ждём worker'ов
-		r.Shutdown()
-		if err := r.DB.Close(); err != nil {
-			log.Printf("Ошибка закрытия DB: %v", err)
-		}
-		log.Println("БД репозиторий закрыт")
-
-	case *filestorage.URLRepository:
-		// Сохраняем данные в файл перед выходом
-		if err := r.SaveURLToFile(); err != nil {
-			log.Printf("Ошибка сохранения в файл: %v", err)
-		}
-		log.Println("Файловый репозиторий сохранён")
-
-	case *memory.URLRepository:
-		// In-memory не требует очистки
-		log.Println("In-memory репозиторий не требует сохранения")
-	}
 }
 
 func printBuildInfo() {
@@ -234,7 +194,6 @@ func setupRouter(shortener shortener.URLService, cfg *config.Config, dbCfg db.DB
 	r.GET("/:id", handler.GetHandler(shortener, auditPub))
 	r.GET("/api/user/urls", handler.GetUserURLsHandler(shortener, cfg))
 	r.DELETE("/api/user/urls", handler.DeleteURLsHandler(shortener))
-
 	r.GET("/ping", handler.PingHandler(dbCfg))
 
 	return r
