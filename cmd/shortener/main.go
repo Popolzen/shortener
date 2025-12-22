@@ -1,14 +1,15 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
-
-	"net/http"
-	_ "net/http/pprof"
+	"time"
 
 	"github.com/Popolzen/shortener/internal/audit"
 	"github.com/Popolzen/shortener/internal/config"
@@ -62,19 +63,88 @@ func main() {
 
 	// Создаем сервис
 	shortener := shortener.NewURLService(repo)
-
-	// Настраиваем роутер
 	r := setupRouter(shortener, cfg, dbCfg, publisher)
 
-	// Запускаем сервер
-	addr := cfg.GetAddress()
-	log.Printf("URL Shortener запущен на http://%s", addr)
-	if err := r.Run(addr); err != nil {
-		log.Fatal("Не удалось запустить сервер:", err)
+	// HTTP/HTTPS сервер с graceful shutdown
+	srv := &http.Server{
+		Addr:    cfg.GetAddress(),
+		Handler: r,
 	}
 
+	// Запуск сервера в горутине
+	go func() {
+		var err error
+		if cfg.EnableHTTPS {
+			log.Printf("URL Shortener запущен на https://%s (HTTPS)", cfg.GetAddress())
+			err = srv.ListenAndServeTLS(cfg.CertFile, cfg.KeyFile)
+		} else {
+			log.Printf("URL Shortener запущен на http://%s", cfg.GetAddress())
+			err = srv.ListenAndServe()
+		}
+
+		if err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Ошибка запуска сервера: %v", err)
+		}
+	}()
+
 	// Graceful Shutdown
-	setupGracefulShutdown(repo)
+	gracefulShutdown(srv, repo, publisher)
+}
+
+// gracefulShutdown обрабатывает сигналы завершения
+func gracefulShutdown(srv *http.Server, repo repository.URLRepository, pub *audit.Publisher) {
+	quit := make(chan os.Signal, 1)
+	// Обрабатываем SIGINT, SIGTERM, SIGQUIT
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+
+	sig := <-quit
+	log.Printf("Получен сигнал %v, начинаем graceful shutdown...", sig)
+
+	// Контекст с таймаутом для завершения запросов
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Останавливаем HTTP сервер (ждём завершения активных запросов)
+	log.Println("Останавливаем HTTP сервер...")
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Printf("Ошибка при остановке сервера: %v", err)
+	}
+
+	// Закрываем репозиторий
+	log.Println("Закрываем репозиторий...")
+	closeRepository(repo)
+
+	// Закрываем audit publisher
+	log.Println("Закрываем audit publisher...")
+	if err := pub.Close(); err != nil {
+		log.Printf("Ошибка закрытия publisher: %v", err)
+	}
+
+	log.Println("Сервис успешно остановлен")
+}
+
+// closeRepository закрывает репозиторий в зависимости от типа
+func closeRepository(repo repository.URLRepository) {
+	switch r := repo.(type) {
+	case *database.URLRepository:
+		// Закрываем канал удаления и ждём worker'ов
+		r.Shutdown()
+		if err := r.DB.Close(); err != nil {
+			log.Printf("Ошибка закрытия DB: %v", err)
+		}
+		log.Println("БД репозиторий закрыт")
+
+	case *filestorage.URLRepository:
+		// Сохраняем данные в файл перед выходом
+		if err := r.SaveURLToFile(); err != nil {
+			log.Printf("Ошибка сохранения в файл: %v", err)
+		}
+		log.Println("Файловый репозиторий сохранён")
+
+	case *memory.URLRepository:
+		// In-memory не требует очистки
+		log.Println("In-memory репозиторий не требует сохранения")
+	}
 }
 
 func printBuildInfo() {
@@ -127,25 +197,6 @@ func initRepository(cfg *config.Config, dbCfg db.DBConfig) repository.URLReposit
 	return repo
 }
 
-// GracefulShutdown
-func setupGracefulShutdown(repo repository.URLRepository) {
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-quit
-		log.Println("Получен сигнал остановки, завершаем работу...")
-		if dbRepo, ok := repo.(*database.URLRepository); ok {
-			dbRepo.Shutdown() // Закрываем канал и ждём worker'ов
-			if err := dbRepo.DB.Close(); err != nil {
-				log.Printf("Ошибка закрытия DB: %v", err)
-			}
-		}
-		log.Println("Сервис остановлен gracefully")
-		os.Exit(0)
-	}()
-}
-
-// initAudit - функция инициализации аудита:
 func initAudit(cfg *config.Config) *audit.Publisher {
 	publisher := audit.NewPublisher()
 
@@ -185,5 +236,6 @@ func setupRouter(shortener shortener.URLService, cfg *config.Config, dbCfg db.DB
 	r.DELETE("/api/user/urls", handler.DeleteURLsHandler(shortener))
 
 	r.GET("/ping", handler.PingHandler(dbCfg))
+
 	return r
 }
