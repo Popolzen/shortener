@@ -224,3 +224,8 @@ func (r *URLRepository) Shutdown() {
 	close(r.DeleteChannel)
 	r.WG.Wait()
 }
+
+func (r *URLRepository) Close() error {
+	r.Shutdown()
+	return r.DB.Close()
+}
