@@ -84,5 +84,18 @@ type URLRepository interface {
 	//   repo.DeleteURLs("user123", []string{"abc123", "def456"})
 	DeleteURLs(userID string, urlIDs []string)
 
+	// GetStats возвращает статистику сервиса.
+	//
+	// Возвращает:
+	//   - urls: количество активных (не удаленных) сокращенных URL
+	//   - users: количество уникальных пользователей
+	//   - error: ошибку при получении статистики
+	//
+	// Примечание: для memory и filestorage может возвращать неполную статистику
+	//
+	// Пример:
+	//   urls, users, err := repo.GetStats()
+	GetStats() (urls int, users int, err error)
+
 	Close() error
 }

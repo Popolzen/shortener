@@ -109,3 +109,10 @@ func (r *URLRepository) DeleteURLs(userID string, urlIDs []string) {
 func (r *URLRepository) Close() error {
 	return r.SaveURLToFile() // Сохраняем данные перед закрытием
 }
+
+// GetStats возвращает статистику (для filestorage - упрощенная версия)
+func (r *URLRepository) GetStats() (urls int, users int, err error) {
+	// В file storage репозитории у нас нет информации о пользователях
+	// Возвращаем количество URL и 0 пользователей
+	return len(r.urls), 0, nil
+}

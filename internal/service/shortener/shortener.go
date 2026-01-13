@@ -205,3 +205,21 @@ func shortURL(length int) string {
 
 	return b.String()
 }
+
+// GetStats возвращает статистику сервиса.
+//
+// Возвращает:
+//   - urls: количество сокращенных URL в сервисе
+//   - users: количество пользователей в сервисе
+//   - error: ошибку при получении статистики
+//
+// Пример использования:
+//
+//	urls, users, err := service.GetStats()
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	fmt.Printf("URLs: %d, Users: %d\n", urls, users)
+func (s *URLService) GetStats() (urls int, users int, err error) {
+	return s.repo.GetStats()
+}

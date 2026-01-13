@@ -470,3 +470,50 @@ func handleConflictError(err error, baseURL string) (string, bool) {
 	}
 	return "", false
 }
+
+// StatsHandler создает обработчик для получения статистики сервиса.
+//
+// Эндпоинт: GET /api/internal/stats
+//
+// Возвращает JSON со статистикой:
+//   - urls: количество сокращенных URL в сервисе
+//   - users: количество пользователей в сервисе
+//
+// Доступ к эндпоинту ограничен через middleware TrustedSubnetMiddleware.
+// Проверяется, что IP из заголовка X-Real-IP входит в доверенную подсеть.
+//
+// Коды ответа:
+//   - 200: статистика успешно получена
+//   - 403: доступ запрещен (проверка в middleware)
+//   - 500: внутренняя ошибка сервера
+//
+// Пример запроса:
+//
+//	GET /api/internal/stats HTTP/1.1
+//	X-Real-IP: 192.168.1.100
+//
+// Пример ответа:
+//
+//	HTTP/1.1 200 OK
+//	Content-Type: application/json
+//
+//	{
+//	  "urls": 12345,
+//	  "users": 678
+//	}
+func StatsHandler(urlService shortener.URLService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		urls, users, err := urlService.GetStats()
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Ошибка получения статистики")
+			return
+		}
+
+		stats := model.Stats{
+			URLs:  urls,
+			Users: users,
+		}
+
+		c.JSON(http.StatusOK, stats)
+	}
+}

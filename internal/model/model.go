@@ -41,3 +41,9 @@ type DeleteTask struct {
 
 // Простая кастомная ошибка
 var ErrURLDeleted = errors.New("URL has been deleted")
+
+// Stats представляет статистику сервиса
+type Stats struct {
+	URLs  int `json:"urls"`
+	Users int `json:"users"`
+}
