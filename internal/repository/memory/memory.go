@@ -48,3 +48,10 @@ func (r *URLRepository) DeleteURLs(userID string, urlIDs []string) {
 func (r *URLRepository) Close() error {
 	return nil
 }
+
+// GetStats возвращает статистику (для memory - упрощенная версия)
+func (r *URLRepository) GetStats() (urls int, users int, err error) {
+	// В memory репозитории у нас нет информации о пользователях
+	// Возвращаем количество URL и 0 пользователей
+	return len(r.urls), 0, nil
+}

@@ -229,3 +229,22 @@ func (r *URLRepository) Close() error {
 	r.Shutdown()
 	return r.DB.Close()
 }
+
+// GetStats возвращает статистику сервиса
+func (r *URLRepository) GetStats() (urls int, users int, err error) {
+	// Подсчет количества активных URL
+	urlQuery := `SELECT COUNT(*) FROM shortened_urls WHERE is_deleted = false`
+	err = r.DB.QueryRow(urlQuery).Scan(&urls)
+	if err != nil {
+		return 0, 0, fmt.Errorf("ошибка при подсчете URL: %w", err)
+	}
+
+	// Подсчет количества уникальных пользователей
+	userQuery := `SELECT COUNT(DISTINCT user_id) FROM shortened_urls`
+	err = r.DB.QueryRow(userQuery).Scan(&users)
+	if err != nil {
+		return 0, 0, fmt.Errorf("ошибка при подсчете пользователей: %w", err)
+	}
+
+	return urls, users, nil
+}

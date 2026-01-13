@@ -19,17 +19,18 @@ const (
 
 // Config содержит конфигурацию приложения
 type Config struct {
-	ServerAddr  string `json:"server_address" env:"SERVER_ADDRESS"`
-	BaseURL     string `json:"base_url" env:"BASE_URL"`
-	FilePath    string `json:"file_storage_path" env:"FILE_STORAGE_PATH"`
-	DBurl       string `json:"database_dsn" env:"DATABASE_DSN"`
-	SecretKey   string `env:"KEY"`
-	AuditFile   string `env:"AUDIT_FILE"`
-	AuditURL    string `env:"AUDIT_URL"`
-	PprofAddr   string `env:"PPROF_ADDRESS"`
-	EnableHTTPS bool   `json:"enable_https" env:"ENABLE_HTTPS"`
-	CertFile    string `env:"CERT_FILE"`
-	KeyFile     string `env:"KEY_FILE"`
+	ServerAddr    string `json:"server_address" env:"SERVER_ADDRESS"`
+	BaseURL       string `json:"base_url" env:"BASE_URL"`
+	FilePath      string `json:"file_storage_path" env:"FILE_STORAGE_PATH"`
+	DBurl         string `json:"database_dsn" env:"DATABASE_DSN"`
+	SecretKey     string `env:"KEY"`
+	AuditFile     string `env:"AUDIT_FILE"`
+	AuditURL      string `env:"AUDIT_URL"`
+	PprofAddr     string `env:"PPROF_ADDRESS"`
+	EnableHTTPS   bool   `json:"enable_https" env:"ENABLE_HTTPS"`
+	CertFile      string `env:"CERT_FILE"`
+	KeyFile       string `env:"KEY_FILE"`
+	TrustedSubnet string `json:"trusted_subnet" env:"TRUSTED_SUBNET"`
 }
 
 func NewConfig() *Config {

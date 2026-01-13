@@ -18,6 +18,7 @@ import (
 	"github.com/Popolzen/shortener/internal/middleware/auth"
 	"github.com/Popolzen/shortener/internal/middleware/compressor"
 	"github.com/Popolzen/shortener/internal/middleware/logger"
+	"github.com/Popolzen/shortener/internal/middleware/subnet"
 	"github.com/Popolzen/shortener/internal/repository"
 	"github.com/Popolzen/shortener/internal/repository/database"
 	"github.com/Popolzen/shortener/internal/repository/filestorage"
@@ -183,7 +184,15 @@ func initAudit(cfg *config.Config) *audit.Publisher {
 
 // setupRouter настраивает роуты и middleware
 func setupRouter(shortener shortener.URLService, cfg *config.Config, dbCfg db.DBConfig, auditPub *audit.Publisher) *gin.Engine {
+
 	r := gin.Default()
+
+	internal := r.Group("/api/internal")
+	internal.Use(subnet.TrustedSubnetMiddleware(cfg.TrustedSubnet))
+	{
+		internal.GET("/stats", handler.StatsHandler(shortener))
+	}
+
 	r.Use(logger.RequestLogger())
 	r.Use(compressor.Compresser())
 	r.Use(auth.AuthMiddleware(cfg))
