@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/Popolzen/shortener/internal/config"
+	"github.com/Popolzen/shortener/internal/model"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -15,7 +16,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const userIDKey string = "user_id"
+const userIDKey model.ContextKey = "user_id"
 
 // UnaryInterceptor создает interceptor для аутентификации
 func UnaryInterceptor(cfg *config.Config) grpc.UnaryServerInterceptor {

@@ -5,12 +5,13 @@ import (
 	"github.com/Popolzen/shortener/internal/audit"
 	"github.com/Popolzen/shortener/internal/config"
 	"github.com/Popolzen/shortener/internal/grpc/interceptors"
+	"github.com/Popolzen/shortener/internal/model"
 	"github.com/Popolzen/shortener/internal/service/shortener"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
 
-const userIDKey string = "user_id"
+const userIDKey model.ContextKey = "user_id"
 
 // NewServer создает и настраивает gRPC сервер
 func NewServer(service shortener.URLService, cfg *config.Config, pub *audit.Publisher) *grpc.Server {
