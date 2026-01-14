@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/Popolzen/shortener/internal/audit"
 	"github.com/Popolzen/shortener/internal/config"
 	"github.com/Popolzen/shortener/internal/db"
+	grpcserver "github.com/Popolzen/shortener/internal/grpc"
 	"github.com/Popolzen/shortener/internal/handler"
 	"github.com/Popolzen/shortener/internal/middleware/auth"
 	"github.com/Popolzen/shortener/internal/middleware/compressor"
@@ -25,6 +27,7 @@ import (
 	"github.com/Popolzen/shortener/internal/repository/memory"
 	"github.com/Popolzen/shortener/internal/service/shortener"
 	"github.com/gin-gonic/gin"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -61,15 +64,23 @@ func main() {
 		repo:      initRepository(cfg, dbCfg),
 	}
 
-	shortener := shortener.NewURLService(app.repo)
-	r := setupRouter(shortener, cfg, dbCfg, app.publisher)
+	shortenerService := shortener.NewURLService(app.repo)
 
+	// HTTP сервер
+	r := setupRouter(shortenerService, cfg, dbCfg, app.publisher)
 	app.server = &http.Server{
 		Addr:    cfg.GetAddress(),
 		Handler: r,
 	}
 
-	// Запуск сервера в горутине
+	// gRPC сервер
+	grpcSrv := grpcserver.NewServer(shortenerService, cfg, app.publisher)
+	grpcListener, err := net.Listen("tcp", cfg.GRPCAddr)
+	if err != nil {
+		log.Fatalf("Не удалось создать gRPC listener: %v", err)
+	}
+
+	// Запуск HTTP сервера в горутине
 	go func() {
 		var err error
 		if cfg.EnableHTTPS {
@@ -81,14 +92,22 @@ func main() {
 		}
 
 		if err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Ошибка запуска сервера: %v", err)
+			log.Fatalf("Ошибка запуска HTTP сервера: %v", err)
 		}
 	}()
 
-	gracefulShutdown(app)
+	// Запуск gRPC сервера в горутине
+	go func() {
+		log.Printf("gRPC сервер запущен на %s", cfg.GRPCAddr)
+		if err := grpcSrv.Serve(grpcListener); err != nil {
+			log.Fatalf("Ошибка запуска gRPC сервера: %v", err)
+		}
+	}()
+
+	gracefulShutdown(app, grpcSrv)
 }
 
-func gracefulShutdown(app *App) {
+func gracefulShutdown(app *App, grpcSrv *grpc.Server) {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
@@ -99,9 +118,15 @@ func gracefulShutdown(app *App) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	// Останавливаем HTTP сервер
 	if err := app.Shutdown(ctx); err != nil {
-		log.Printf("Ошибка при shutdown: %v", err)
+		log.Printf("Ошибка при HTTP shutdown: %v", err)
 	}
+
+	// Останавливаем gRPC сервер
+	log.Println("Останавливаем gRPC сервер...")
+	grpcSrv.GracefulStop()
+
 	if err := app.Close(); err != nil {
 		log.Printf("Ошибка при закрытии репозитория и аудита: %v", err)
 	}

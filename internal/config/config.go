@@ -15,6 +15,7 @@ const (
 	DefaultFilePath      = "storage.json"
 	DefaultAuditFilePath = "audit_storage.json"
 	DefaultPprofAddr     = "localhost:6060"
+	DefaultGRPCAddr      = ":3200"
 )
 
 // Config содержит конфигурацию приложения
@@ -31,6 +32,7 @@ type Config struct {
 	CertFile      string `env:"CERT_FILE"`
 	KeyFile       string `env:"KEY_FILE"`
 	TrustedSubnet string `json:"trusted_subnet" env:"TRUSTED_SUBNET"`
+	GRPCAddr      string `json:"grpc_address" env:"GRPC_ADDRESS"`
 }
 
 func NewConfig() *Config {
@@ -40,6 +42,7 @@ func NewConfig() *Config {
 		FilePath:   DefaultFilePath,
 		PprofAddr:  DefaultPprofAddr,
 		AuditFile:  DefaultAuditFilePath,
+		GRPCAddr:   DefaultGRPCAddr,
 	}
 
 	configFile := getConfigPath()
@@ -79,6 +82,7 @@ func (c *Config) getArgsFromCli() {
 	flag.StringVar(&c.AuditFile, "audit-file", c.AuditFile, "audit file path")
 	flag.StringVar(&c.AuditURL, "audit-url", c.AuditURL, "audit server URL")
 	flag.StringVar(&c.PprofAddr, "pprof", c.PprofAddr, "pprof server address")
+	flag.StringVar(&c.GRPCAddr, "g", c.GRPCAddr, "gRPC server address")
 	flag.BoolVar(&c.EnableHTTPS, "s", c.EnableHTTPS, "enable HTTPS")
 	flag.String("c", "", "config file path")
 	flag.String("config", "", "config file path")
